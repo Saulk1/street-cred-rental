@@ -1,5 +1,8 @@
 // Background service worker for the Microburbs Facts extension.
 importScripts("consts.js");
+// The source placeholder is replaced with generated config in dist/unpacked.
+try { importScripts("runtime-config.js"); } catch { /* API reports a configuration error on lookup. */ }
+importScripts("property-api.js");
 
 async function saveNote(text, type) {
   const id = crypto.randomUUID();
@@ -9,10 +12,25 @@ async function saveNote(text, type) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== NOTEPAD.MESSAGES.SAVE_SELECTION_NOTE) return;
+  if (![NOTEPAD.MESSAGES.SAVE_SELECTION_NOTE, NOTEPAD.MESSAGES.SEARCH_ADDRESS,
+    NOTEPAD.MESSAGES.PROPERTY_DETAILS].includes(message?.type)) return;
   if (sender.id !== chrome.runtime.id || sender.frameId !== 0
-    || !Number.isInteger(sender.tab?.id) || !/^https?:\/\//.test(sender.url ?? "")
-    || typeof message.text !== "string" || !message.text.trim()) {
+    || !Number.isInteger(sender.tab?.id) || !/^https?:\/\//.test(sender.url ?? "")) {
+    sendResponse({ ok: false });
+    return;
+  }
+  if (message.type === NOTEPAD.MESSAGES.SEARCH_ADDRESS || message.type === NOTEPAD.MESSAGES.PROPERTY_DETAILS) {
+    const search = message.type === NOTEPAD.MESSAGES.SEARCH_ADDRESS;
+    const value = search ? message.address : message.id;
+    if (typeof value !== "string" || (search ? value.trim().length < 2 || value.length > 1000 : !/^[A-Za-z0-9_-]{1,80}$/.test(value))) {
+      sendResponse({ ok: false, error: { code: "validation", message: "Select one address with at least two characters (maximum 1000)." } });
+      return;
+    }
+    const operation = search ? PROPERTY_API.search(value.trim().replace(/\s+/g, " ")) : PROPERTY_API.details(value);
+    operation.then(sendResponse, () => sendResponse({ ok: false, error: { code: "server", message: "Could not look up this property. Please retry." } }));
+    return true;
+  }
+  if (typeof message.text !== "string" || !message.text.trim()) {
     sendResponse({ ok: false });
     return;
   }
@@ -42,7 +60,8 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     });
     for (const properties of [
       { id: NOTEPAD.MENUS.SELECTION, title: "Save selected text to notes", contexts: ["selection"] },
-      { id: NOTEPAD.MENUS.URL, title: "Save page URL to notes", contexts: ["page"] },
+      { id: NOTEPAD.MENUS.LOOKUP, title: "Look up property", contexts: ["selection"],
+        documentUrlPatterns: ["http://*/*", "https://*/*"] },
     ]) {
       await new Promise((resolve, reject) => {
         chrome.contextMenus.create(properties, () => {
@@ -58,22 +77,26 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 });
 
 // Register at startup, rather than inside onInstalled, to handle worker restarts.
-chrome.contextMenus.onClicked.addListener(async info => {
-  let text;
-  let type;
-  if (info.menuItemId === NOTEPAD.MENUS.SELECTION) {
-    text = info.selectionText;
-    type = NOTEPAD.TYPES.SELECTION;
-  } else if (info.menuItemId === NOTEPAD.MENUS.URL) {
-    text = info.pageUrl;
-    type = NOTEPAD.TYPES.URL;
-  } else {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  const text = info.selectionText;
+  if (info.menuItemId === NOTEPAD.MENUS.LOOKUP) {
+    if (!Number.isInteger(tab?.id) || tab.id < 0 || info.editable
+      || (info.frameId !== undefined && info.frameId !== 0)
+      || !/^https?:\/\//.test(info.pageUrl ?? "")
+      || typeof text !== "string" || text.trim().length < 2 || text.length > 1000) return;
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id,
+        { type: NOTEPAD.MESSAGES.LOOK_UP_SELECTION, text }, { frameId: 0 });
+      if (!response?.ok) throw new Error("Lookup unavailable");
+    } catch {
+      console.error("Could not open property lookup. Reload this webpage, select an address and try again.");
+    }
     return;
   }
-  if (typeof text !== "string" || !text.trim()) return;
+  if (info.menuItemId !== NOTEPAD.MENUS.SELECTION || typeof text !== "string" || !text.trim()) return;
 
   try {
-    await saveNote(text, type);
+    await saveNote(text, NOTEPAD.TYPES.SELECTION);
   } catch {
     // Do not include selected text or URLs in diagnostic output.
     console.error("Could not save the context-menu note. Please try again.");

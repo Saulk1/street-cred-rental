@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Property lookup preview — mock data</title>
+    <script src="../../consts.js" defer></script>
+    <script src="../../content-script/property-lookup.js" defer></script>
+    <script src="property-preview.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Property lookup preview — mock data</h1>
+      <p>This development fixture uses invented responses, makes no API calls and does not save notes.</p>
+      <label for="scenario">Scenario</label>
+      <select id="scenario">
+        <option value="multiple">Multiple address matches</option>
+        <option value="single">One address match</option>
+        <option value="partial">Partial data failure</option>
+        <option value="empty">No matches</option>
+      </select>
+      <button id="preview" type="button">Preview property card</button>
+    </main>
+  </body>
+</html>

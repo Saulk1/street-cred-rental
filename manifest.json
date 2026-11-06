@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Microburbs Facts",
   "version": "0.1.0",
-  "description": "Keep local notes, save selected text and page URLs, and open Microburbs Facts tools from the popup.",
+  "description": "Look up selected property addresses, save selected text as local notes, and open Microburbs Facts tools from the popup.",
   "background": {
     "service_worker": "background.js"
   },
@@ -14,7 +14,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["consts.js", "content-script/content-script.js", "content-script/selection-card.js"],
+      "js": ["consts.js", "content-script/content-script.js", "content-script/property-lookup.js", "content-script/selection-card.js"],
       "css": ["content-script/content-script.css", "content-script/selection-card.css"],
       "run_at": "document_idle",
       "all_frames": false

@@ -7,6 +7,7 @@ import { note, noteKey, storageMock } from "./helpers/storage.mjs";
 
 const source = await readFile(new URL("../background.js", import.meta.url), "utf8");
 const consts = await readFile(new URL("../consts.js", import.meta.url), "utf8");
+const apiSource = await readFile(new URL("../property-api.js", import.meta.url), "utf8");
 const welcomeURL = "chrome-extension://test-extension/welcome/welcome.html";
 
 function background(createTab = async () => ({ id: 1 }), store = storageMock(), menuFailure) {
@@ -17,6 +18,7 @@ function background(createTab = async () => ({ id: 1 }), store = storageMock(), 
   const menus = new Map();
   const clickListeners = [];
   const messageListeners = [];
+  const tabMessages = [];
   const chrome = {
     storage: store.storage,
     contextMenus: {
@@ -43,21 +45,27 @@ function background(createTab = async () => ({ id: 1 }), store = storageMock(), 
       },
     },
     tabs: {
+      async sendMessage(tabId, message, options) {
+        tabMessages.push({ tabId, message, options });
+        return { ok: true };
+      },
       create({ url, active }) {
         calls.push({ url, active });
         return createTab();
       },
     },
   };
-  const context = vm.createContext({ chrome, crypto: { randomUUID }, console: { error: (...args) => errors.push(args) } });
+  const context = vm.createContext({ chrome, URLSearchParams, AbortController, setTimeout, clearTimeout,
+    crypto: { randomUUID }, console: { error: (...args) => errors.push(args) } });
   context.importScripts = path => {
-    assert.equal(path, "consts.js");
-    vm.runInContext(consts, context);
+    if (path === "consts.js") vm.runInContext(consts, context);
+    else if (path === "property-api.js") vm.runInContext(apiSource, context);
+    else throw new Error("Missing generated configuration");
   };
   vm.runInContext(source, context);
-  return { listeners, calls, paths, errors, menus, clickListeners, store,
+  return { listeners, calls, paths, errors, menus, clickListeners, store, chrome, tabMessages,
     message: (message, sender, respond) => messageListeners[0](message, sender, respond),
-    click: info => clickListeners[0](info),
+    click: (info, tab) => clickListeners[0](info, tab),
     install: reason => Promise.all(listeners.map(listener => listener({ reason }))) };
 }
 
@@ -122,10 +130,14 @@ test("card storage failures return a retryable response without logging selected
 test("install and updates recreate two menus without duplicates or resetting notes", async () => {
   const stored = note("existing");
   const app = background(undefined, storageMock({ [noteKey(stored.id)]: stored }));
+  app.menus.set("save-page-url-note", { contexts: ["page"] });
   for (const reason of ["install", "update", "update"]) {
     await app.install(reason);
     assert.equal(app.menus.size, 2);
-    assert.deepEqual([...app.menus.values()].map(menu => Array.from(menu.contexts)), [["selection"], ["page"]]);
+    assert.deepEqual([...app.menus.values()].map(menu => Array.from(menu.contexts)), [["selection"], ["selection"]]);
+    assert.equal(app.menus.has("save-page-url-note"), false);
+    assert.equal(app.menus.get("look-up-property").title, "Look up property");
+    assert.deepEqual(Array.from(app.menus.get("look-up-property").documentUrlPatterns), ["http://*/*", "https://*/*"]);
     assert.deepEqual(app.store.data[noteKey(stored.id)], stored);
   }
   assert.equal(app.calls.length, 1);
@@ -138,7 +150,7 @@ test("menu failures are handled independently of welcome-tab creation", async ()
   assert.match(app.errors[0][0], /Could not set up/);
 });
 
-test("context captures preserve text and use the page URL rather than frame or link URL", async () => {
+test("context captures preserve selected text and ignore the removed URL action", async () => {
   const app = background();
   await Promise.all([
     app.click({ menuItemId: "save-selection-note", selectionText: "  <b>selected</b>\ntext  " }),
@@ -146,10 +158,9 @@ test("context captures preserve text and use the page URL rather than frame or l
       frameUrl: "https://example.com/frame", linkUrl: "https://example.com/link" }),
   ]);
   const notes = Object.values(app.store.data);
-  assert.equal(notes.length, 2);
-  assert.notEqual(notes[0].id, notes[1].id);
+  assert.equal(notes.length, 1);
   assert.deepEqual(notes.map(note => [note.type, note.text]), [
-    ["selection", "  <b>selected</b>\ntext  "], ["url", "https://example.com/page"],
+    ["selection", "  <b>selected</b>\ntext  "],
   ]);
   for (const note of notes) {
     assert.ok(note.createdAt > 0);
@@ -174,6 +185,43 @@ test("worker restarts preserve notes and immediately handle new captures", async
   await background(undefined, store).click({ menuItemId: "save-selection-note", selectionText: "first" });
   await background(undefined, store).click({ menuItemId: "save-selection-note", selectionText: "second" });
   assert.deepEqual(Object.values(store.data).map(note => note.text), ["first", "second"]);
+});
+
+const lookupInfo = { menuItemId: "look-up-property", selectionText: "26 Tudor Street, Surry Hills",
+  pageUrl: "https://example.com/property", frameId: 0, editable: false };
+
+test("context lookup targets the clicked tab's top frame without creating notes", async () => {
+  const app = background();
+  await app.click(lookupInfo, { id: 42 });
+  assert.equal(app.tabMessages.length, 1);
+  const sent = app.tabMessages[0];
+  assert.equal(sent.tabId, 42);
+  assert.equal(sent.options.frameId, 0);
+  assert.equal(sent.message.type, "LOOK_UP_SELECTION");
+  assert.equal(sent.message.text, lookupInfo.selectionText);
+  assert.deepEqual(app.store.data, {});
+});
+
+test("context lookup rejects unsupported pages, frames, fields, tabs and text", async () => {
+  const app = background();
+  for (const override of [{ frameId: 3 }, { editable: true }, { pageUrl: "chrome://settings" },
+    { selectionText: " " }, { selectionText: "a" }, { selectionText: "a".repeat(1001) }, { selectionText: undefined }]) {
+    await app.click({ ...lookupInfo, ...override }, { id: 42 });
+  }
+  for (const tab of [undefined, {}, { id: -1 }]) await app.click(lookupInfo, tab);
+  assert.deepEqual(app.tabMessages, []);
+  assert.deepEqual(app.store.data, {});
+});
+
+test("context lookup handles missing receivers and rejected replies without logging selected text", async () => {
+  for (const deliver of [async () => { throw new Error(lookupInfo.selectionText); }, async () => ({ ok: false })]) {
+    const app = background();
+    app.chrome.tabs.sendMessage = deliver;
+    await assert.doesNotReject(() => app.click(lookupInfo, { id: 42 }));
+    assert.match(app.errors[0][0], /Reload this webpage/);
+    assert.ok(!JSON.stringify(app.errors).includes(lookupInfo.selectionText));
+    assert.deepEqual(app.store.data, {});
+  }
 });
 
 test("storage errors are caught without logging note contents", async () => {
@@ -220,4 +268,32 @@ test("a synchronous tab API failure is also handled without retrying", async () 
   assert.equal(app.calls.length, 1);
   assert.equal(app.errors.length, 1);
   assert.equal(app.errors[0][1], failure);
+});
+
+test("property messages reject invalid senders and malformed payloads without accessing the API", () => {
+  const app = background();
+  for (const [message, sender] of [
+    [{ type: "SEARCH_ADDRESS", address: " " }, cardSender],
+    [{ type: "SEARCH_ADDRESS", address: "x".repeat(1001) }, cardSender],
+    [{ type: "PROPERTY_DETAILS", id: "../arbitrary/path" }, cardSender],
+    [{ type: "PROPERTY_DETAILS", id: "GANSW1" }, { ...cardSender, frameId: 2 }],
+    [{ type: "SEARCH_ADDRESS", address: "26 Tudor Street" }, { ...cardSender, id: "another-extension" }],
+  ]) {
+    let response;
+    assert.equal(app.message(message, sender, value => { response = value; }), undefined);
+    assert.equal(response.ok, false);
+  }
+  assert.deepEqual(app.store.data, {});
+});
+
+test("real worker property handlers return setup feedback with no configuration or API calls", async () => {
+  const app = background();
+  for (const message of [{ type: "SEARCH_ADDRESS", address: "26 Tudor Street\nSurry Hills" }, { type: "PROPERTY_DETAILS", id: "GANSW1" }]) {
+    const response = await new Promise(resolve => {
+      assert.equal(app.message(message, cardSender, resolve), true);
+    });
+    if (message.type === "SEARCH_ADDRESS") assert.equal(response.error.code, "configuration");
+    else for (const section of Object.values(response.sections)) assert.equal(section.error.code, "configuration");
+  }
+  assert.deepEqual(app.store.data, {});
 });

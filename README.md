@@ -9,7 +9,7 @@ and requests the `sidePanel`, `storage` and `contextMenus` API permissions.
 A content script waits for **Show page widget** before
 adding a dismissible widget to an ordinary HTTP or HTTPS page; its manifest match
 patterns request access to those sites.
-Selecting regular page text also reveals a compact **Save to notes** card.
+Selecting regular page text reveals a card with **Save to notes** and **Look up property**.
 
 ## Microburbs Hackathon 2026
 
@@ -37,10 +37,21 @@ Released under the [MIT License](LICENSE). Copyright © 2026 Street Cred contrib
 
 ## Install locally
 
-1. Open `chrome://extensions` in desktop Chrome.
-2. Turn on **Developer mode**.
-3. Click **Load unpacked** and choose this project folder (the folder containing `manifest.json`).
-4. Pin **Microburbs Facts** from Chrome's Extensions menu and click its icon.
+1. Create `.env.local` if it does not exist. Set `MICROBURBS_API_BASE_URL=https://api.microburbs.com.au` and `MICROBURBS_API_KEY` to your team's key. Keep existing local credentials when updating an installation.
+2. Run `python3 scripts/package.py` to generate the local runtime configuration, `dist/unpacked/` and the ZIP. An empty key is supported for development: notes work, and property lookups show setup guidance.
+3. Open `chrome://extensions` in desktop Chrome and turn on **Developer mode**.
+4. Click **Load unpacked** and choose **`dist/unpacked/`**, which contains the generated manifest.
+5. Pin **Microburbs Facts** from Chrome's Extensions menu and click its icon.
+
+This is a local team build. `.env.local` and generated files in `dist/` stay out
+of Git, but the generated extension contains an inspectable copy of the key.
+Do not distribute a package containing a private team key publicly.
+The root `runtime-config.js` is an empty source placeholder, never a place for keys.
+The Python builder reads dotenv assignments without running shell code or expanding variables.
+
+Chrome treats loading from a new folder as a separate unpacked installation.
+If you previously loaded the repository root, its saved notes remain with that
+installation; this feature does not migrate notes between extension identities.
 
 Keep Developer mode on while using the unpacked extension; current Chrome disables
 unpacked extensions when it is turned off.
@@ -51,8 +62,33 @@ does not reopen on extension reloads, updates, browser updates or browser restar
 Uninstalling and reinstalling counts as a fresh installation and shows it again.
 Existing users receiving an update do not see the welcome tab.
 
-After editing the source, click **Reload** on its card in `chrome://extensions`,
-then reopen the popup. No install command, build step or development server is needed.
+After editing source or `.env.local`, rebuild with `python3 scripts/package.py`,
+click **Reload** on its card in `chrome://extensions`, and reopen the popup.
+Reload existing webpages to refresh their content scripts. No npm install or
+development server is needed for normal use.
+
+If lookup still shows setup guidance after rebuilding, open the extension's
+**Details** in `chrome://extensions` and check **Loaded from**. It must point to
+`dist/unpacked/`; loading the repository root uses the empty source configuration.
+Disable the root installation before loading the generated folder to avoid
+duplicate controls. Its saved notes remain in the disabled installation.
+
+### Selection card recovery
+
+After a rebuild, reload the extension **and refresh any already-open webpages**.
+Extension reloads invalidate content scripts that are still running in those
+pages. The old controller now removes its card, cancels pending work and logs
+once: **The extension was reloaded. Reload this webpage to restore the selection
+card.** It cannot reconnect itself; refreshing the webpage loads a new controller.
+The extension never refreshes webpages automatically or discards form input.
+
+If the card still cannot open on a freshly loaded page, check the extension's
+Errors view or the page console. Startup diagnostics identify the failing stage
+and exception name without logging selected text, request payloads or keys.
+Stylesheet failures identify the bundled-style loading stage and can be retried
+after rebuilding/reloading. A property-lookup setup failure leaves **Save to notes**
+available with an explanation. If native popover opening fails, the card switches
+to its fixed-position fallback while keeping keyboard and dismissal behavior.
 
 Use **Open options** in the popup to open or focus the options tab. You can also
 right-click the extension's toolbar icon and choose **Options**. The page currently
@@ -66,11 +102,10 @@ in the scrollable list below the editor. Each **Delete** button immediately remo
 that note. Blank notes are rejected; line breaks and other entered text are
 preserved. Notes are displayed as plain text, including saved URLs.
 
-Right-click selected text and choose **Save selected text to notes**, or right-click
-the page background and choose **Save page URL to notes**. The URL action saves
-the current page URL, rather than a clicked link or an embedded frame URL. Both
-actions work while the popup is closed. Reopen it to see captured notes; an open
-popup also refreshes when notes change.
+Right-click selected text and choose **Save selected text to notes**. The action
+works while the popup is closed. Reopen it to see captured notes; an open popup
+also refreshes when notes change. Previously saved URL notes remain readable and
+deletable; the page-URL saving action has been removed.
 
 On an ordinary HTTP or HTTPS page, select text with the mouse or keyboard to
 show a **Save to notes** card beside the selection. Click it to save the selected
@@ -85,6 +120,39 @@ selection to show it again. Near the bottom of the screen it appears above the
 text. Selections in inputs, textareas, editable content and embedded frames are
 excluded. The existing right-click menu remains available independently.
 Reload any already-open webpage after reloading the extension to use this feature.
+
+### Property lookup
+
+Select one full address on a regular webpage and click **Look up property** in
+the selection card, or right-click the selected address and choose
+**Look up property** from the extension's context menu. Either action opens
+results in the same on-page card without saving a note. The context-menu action
+supports non-editable text in the top-level HTTP/HTTPS page; it does not infer an
+address from the page URL or content. If it cannot reach the card, the worker
+logs guidance to reload the webpage and retry.
+The worker sends only that address to the configured Microburbs Hackathon API.
+It displays up to ten ranked address matches; choose one when there is more than
+one. A single match loads automatically, with its matched address and GNAF ID
+shown prominently. **Choose another match** returns to a multiple-match list.
+Matching is not an exact-address guarantee. Include the unit number and suburb
+when relevant. Coverage is limited to the **City of Sydney LGA**.
+
+The expanded, scrollable card shows property type, bedrooms, bathrooms, covered
+parking and indicative advertised land area; the automated valuation in AUD,
+80% prediction interval, prediction date and model confidence; and property
+overlays and nearby features. Missing values show **Not available**, distinct
+from zero. Partial API failures retain other sections and offer retry.
+Nearby overlays are distinguished from overlays at the address point. Power
+lines and mobile black spots are proximity information; public-housing records
+appear as neighbourhood context. These are model and overlay outputs, not a
+formal appraisal or planning certificate.
+
+Lookup is explicit and does not save a note. **Save to notes** remains independent.
+Scrolling inside the card works normally; page scrolling, resizing and Escape
+dismiss it. The worker times out individual API calls after 20 seconds, limits
+request starts to eight per second across tabs, coalesces identical in-flight
+requests and observes `Retry-After` before allowing rate-limit retries. It does
+not persist property results or log keys and selected addresses.
 
 Notes stay in this Chrome profile through extension reloads and browser restarts;
 they are not synced or sent to a server. Uninstalling the extension removes them.
@@ -114,12 +182,16 @@ including browser settings and the Chrome Web Store, from content script injecti
 - `welcome/`: contains the static greeting page and stylesheet opened on a fresh installation.
 - `content-script/`: contains the existing widget and separate `selection-card.js`/`selection-card.css` for capturing selected page text. Both use Shadow DOM with bundled stylesheets; only those CSS files are web accessible.
 - `background.js`: the extension service worker, which saves selection-card messages, manages note-capture context menus and opens the welcome tab only for a fresh installation.
+- `property-api.js`: worker-only API calls, throttling, safe errors and normalisation of property responses. `content-script/property-lookup.js` renders the expanded lookup card.
 - `icons/`: original PNG artwork in Chrome's required sizes; editable source in `assets/icon.svg`.
 - `store/`: listing draft and screenshot for submission preparation; not extension runtime files.
 
-The extension makes no external network requests and includes no telemetry. It
-stores manually entered notes, selected text and page URLs locally only when you
-choose to save them; it does not read browsing history. Its content script adds and removes its
+The extension includes no telemetry. An explicit property lookup sends the
+selected address and the matched property's GNAF ID to the configured Microburbs
+API using the team key; the service's response is displayed in the card. It
+stores manually entered notes and selected text locally only when you
+choose to save them, and retains previously saved URL notes; it does not read
+browsing history. Its content script adds and removes its
 own widget and selection-card DOM without changing the page's existing content.
 The selection card reads the current selection into temporary page memory to
 position its action; it sends that text to the worker for local storage only
@@ -136,7 +208,11 @@ python3 scripts/package.py
 
 The archive is `dist/microburbs-facts-0.1.0.zip`. Its manifest is at the ZIP root;
 only runtime files and the MIT license are included. Documentation, skills,
-source artwork, screenshots and the packaging script stay out of the upload.
+source artwork, screenshots, the API YAML, tests, `.env.local` and packaging scripts
+stay out of the upload. `runtime-config.js` and the API origin permissions/CSP are
+generated in `dist/unpacked/`; the ZIP contains the same runtime bytes. Source
+files are not rewritten by the build. The generated key is worker-only and is
+not included in content scripts or web-accessible resources.
 
 ## Modern Web Guidance tooling
 
@@ -250,6 +326,7 @@ Use Node.js 22+ and Python 3; no npm dependencies are required:
 
 ```sh
 node --test tests/*.test.mjs
+python3 -m unittest discover -s tests -p '*_test.py'
 npm run test:package
 ```
 
@@ -273,6 +350,17 @@ tests also verify selection-message sender validation and responses after persis
 For manual checks, run `python3 -m http.server 8766 --bind 127.0.0.1` from this
 repository and open `http://127.0.0.1:8766/tests/fixtures/selection-card.html` in
 Chrome with the extension loaded. This development fixture is excluded from the ZIP.
+It includes an example Sydney address for checking the native context-menu lookup.
+
+Property tests use fake responses and dummy credentials, never a real API key.
+They cover candidate filtering, unit-address encoding, partial failures, null/zero
+handling, overlay containment, sender validation, request coalescing, throttling,
+HTTP errors, `Retry-After`, timeout and stale replies. Python tests build temporary
+copies with dummy configuration and verify permissions, source preservation and
+package exclusions. `tests/fixtures/property-preview.html` is a labelled mock-data
+preview of the lookup UI served by the same local development server.
+Context-menu tests also cover removal of URL saving, lookup delivery to the clicked
+tab, native-menu selection snapshots, stale requests and legacy URL-note display/deletion.
 
 ## Publication status
 
@@ -282,6 +370,46 @@ Add useful functionality before seeking public approval. Nothing has been submit
 or published. See `store/listing.md` for accurate draft copy and preparation steps.
 
 ## Visible browser checks performed
+
+On 2026-11-06, the rebuilt extension's native context menu was checked in visible
+Chrome on the local selection-card fixture. Right-clicking the selected
+**26 Tudor Street, Surry Hills** address showed **Save selected text to notes**
+and **Look up property** in the extension submenu, with no URL-saving action.
+Choosing **Look up property** opened address choices in the card; choosing the
+Sydney match loaded live facts, valuation and risks without a second lookup click.
+
+On 2026-11-06, selection-card recovery was checked in visible Chrome. A card
+opened on the local fixture; after reloading the extension while that page stayed
+open, selecting text removed the stale card and recorded the actionable webpage
+reload diagnostic. Refreshing the fixture restored both actions. A fresh tab at
+the originally reported Microburbs developer billing page also showed **Save to
+notes** and **Look up property** when its Billing heading was selected. No API
+requests or note writes were needed for these recovery checks. Simulated lookup,
+popover and stylesheet failures are covered by automated regression tests.
+
+On 2026-11-06, the real extension's lookup action was checked without a key and
+displayed `.env.local` setup guidance. The separate labelled mock-data preview
+verified address choices, selected unit-address display, facts including zero
+parking, valuation formatting, overlay labels, neighbourhood context and internal
+card scrolling. These previews do not verify live API availability or real
+address matching.
+
+On 2026-11-06, authenticated requests to the configured production API returned
+HTTP 200 for `/v1/me`, address search for **26 Tudor Street, Surry Hills**, and
+that property's facts, valuation and risks. The existing generated build had no
+key and targeted a different API host; rebuild from `.env.local`, reload the
+extension from `dist/unpacked/`, and refresh existing webpages to apply the
+current configuration. These HTTP checks verify API access separately from
+browser rendering.
+
+The subsequent visible Chrome check confirmed the installed extension was
+loading the repository root and therefore the empty source configuration.
+The root installation was disabled, preserving its notes, and the rebuilt
+`dist/unpacked/` installation was loaded. On a local address-only verification
+page, selecting **26 Tudor Street, Surry Hills**, clicking **Look up property**,
+and choosing the matching address loaded live property facts, valuation and
+risks. **Save to notes** then displayed **Note saved.** The new installation has
+separate note storage from the disabled root installation.
 
 On 2026-11-06, the selection card was checked in visible Chrome on the local
 verification page. Selecting text showed the card, clicking Save preserved the

@@ -7,6 +7,7 @@ import { note, noteKey, settle, storageMock } from "./helpers/storage.mjs";
 
 const source = await readFile(new URL("../popup/popup.js", import.meta.url), "utf8");
 const consts = await readFile(new URL("../consts.js", import.meta.url), "utf8");
+const apiSource = await readFile(new URL("../property-api.js", import.meta.url), "utf8");
 const workerSource = await readFile(new URL("../background.js", import.meta.url), "utf8");
 
 class Element {
@@ -298,15 +299,28 @@ test("context-menu and popup saves coexist, including a capture during deletion"
     runtime: { onInstalled: { addListener() {} }, onMessage: { addListener() {} } },
     contextMenus: { onClicked: { addListener: listener => { capture = listener; } } },
   } });
-  context.importScripts = () => vm.runInContext(consts, context);
+  context.importScripts = path => {
+    if (path === "consts.js") vm.runInContext(consts, context);
+    else if (path === "property-api.js") vm.runInContext(apiSource, context);
+    else throw new Error("Missing generated configuration");
+  };
   vm.runInContext(workerSource, context);
   app.elements.get("note-text").value = "manual";
   await Promise.all([app.save(), capture({ menuItemId: "save-selection-note", selectionText: "selected" })]);
   assert.deepEqual(new Set(app.texts()), new Set(["manual", "selected"]));
   const deletedId = app.deletes()[0].dataset.noteId;
-  await Promise.all([app.deletes()[0].click(), capture({ menuItemId: "save-page-url-note", pageUrl: "https://example.com" })]);
+  await Promise.all([app.deletes()[0].click(), capture({ menuItemId: "save-selection-note", selectionText: "another selection" })]);
   await settle();
   assert.equal(Object.keys(app.store.data).length, 2);
   assert.equal(app.store.data[noteKey(deletedId)], undefined);
-  assert.ok(app.texts().includes("https://example.com"));
+  assert.ok(app.texts().includes("another selection"));
+});
+
+test("previously saved URL notes remain readable and deletable", async () => {
+  const stored = note("old-url", "https://example.com", 1, "url");
+  const app = await popup({}, storageMock({ [noteKey(stored.id)]: stored }));
+  assert.deepEqual(app.texts(), [stored.text]);
+  await app.deletes()[0].click();
+  assert.deepEqual(app.texts(), []);
+  assert.equal(app.store.data[noteKey(stored.id)], undefined);
 });

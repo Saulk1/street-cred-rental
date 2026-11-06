@@ -23,7 +23,7 @@ class PackageTests(unittest.TestCase):
                     continue
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes((ROOT / name).read_bytes())
+                target.write_bytes(pack.runtime_source(ROOT, name).read_bytes())
             (root / '.env.local').write_text('MICROBURBS_API_BASE_URL=https://api.example.test\nMICROBURBS_API_KEY="dummy-key"\n')
             manifest, contents, archive = pack.build(root)
             self.assertEqual(manifest['host_permissions'], ['https://api.example.test/*'])
@@ -31,6 +31,14 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(json.loads((root / 'manifest.json').read_text()), source_manifest)
             self.assertIn(b'dummy-key', contents['runtime-config.js'])
             self.assertFalse(any(name.endswith('.yaml') or '.env' in name or name.startswith('tests/') for name in contents))
+            self.assertFalse(any(name.startswith(("src/", ".build/", "node_modules/", ".agents/", ".tools/")) or name.endswith((".tsx", ".map")) for name in contents))
+            self.assertIn("ui/injected.js", contents)
+            self.assertIn("ui/selection-card.css", contents)
+            self.assertNotIn(b"@import", contents["ui/pages.css"])
+            # Only host positioning rules are installed into the host page.
+            host_css = contents["content-script/selection-card.css"].decode()
+            self.assertNotIn("@layer", host_css)
+            self.assertNotIn("@theme", host_css)
             with ZipFile(archive) as zipped:
                 self.assertEqual(len(zipped.namelist()), len(set(zipped.namelist())))
                 for name, data in contents.items():

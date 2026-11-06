@@ -23,7 +23,7 @@ export function storageMock(initial = {}) {
         for (const listener of listeners) listener(changes, "local");
       },
     },
-    onChanged: { addListener: listener => listeners.push(listener) },
+    onChanged: { addListener: listener => listeners.push(listener), removeListener: listener => { const index = listeners.indexOf(listener); if (index >= 0) listeners.splice(index, 1); } },
   };
   return { storage, data, listeners };
 }

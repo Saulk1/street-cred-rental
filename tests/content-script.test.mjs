@@ -65,6 +65,12 @@ function page(loadStyles = async () => stylesheet()) {
   };
   vm.runInNewContext(source, {
     window, document, chrome,
+    MicroburbsUI: { mountWidget(shadow, close) {
+      const button = document.createElement("button");
+      button.setAttribute("aria-label", "Close Microburbs Facts widget");
+      button.addEventListener("click", close); shadow.append(button);
+      return { dispose() { button.remove(); } };
+    } },
     fetch(url) {
       fetches.push(url);
       return loadStyles();
@@ -102,7 +108,7 @@ test("SHOW_WIDGET creates a visible widget and acknowledges success after loadin
   assert.deepEqual(await request.response, { ok: true });
   assert.equal(app.root.children.length, 1);
   assert.equal(app.widget().hidden, false);
-  assert.deepEqual(app.fetches, ["chrome-extension://test-extension/content-script/content-script.css"]);
+  assert.deepEqual(app.fetches, ["chrome-extension://test-extension/ui/widget.css"]);
 });
 
 test("simultaneous and repeated show requests share one widget and stylesheet request", async () => {

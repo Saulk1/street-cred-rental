@@ -14,7 +14,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["consts.js", "content-script/content-script.js", "content-script/property-lookup.js", "content-script/selection-card.js"],
+      "js": ["consts.js", "ui/injected.js", "content-script/content-script.js", "content-script/property-lookup.js", "content-script/selection-card.js"],
       "css": ["content-script/content-script.css", "content-script/selection-card.css"],
       "run_at": "document_idle",
       "all_frames": false
@@ -22,7 +22,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content-script/content-script.css", "content-script/selection-card.css"],
+      "resources": ["ui/widget.css", "ui/selection-card.css"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ],

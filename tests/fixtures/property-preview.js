@@ -29,11 +29,11 @@ document.getElementById("preview").addEventListener("click", async () => {
   host.id = "microburbs-facts-selection-card";
   const shadow = host.attachShadow({ mode: "open" });
   const sheet = new CSSStyleSheet();
-  sheet.replaceSync(await (await fetch("../../content-script/selection-card.css")).text());
+  sheet.replaceSync(await (await fetch("../../.build/runtime/ui/selection-card.css")).text());
   shadow.adoptedStyleSheets = [sheet];
   document.documentElement.append(host);
   host.style.left = "16px";
-  host.style.top = "180px";
+  host.style.top = `${Math.min(180, window.innerHeight * 0.1)}px`;
   active = PROPERTY_LOOKUP.attach({ host, shadow, selection: { text: "26 Tudor Street, Surry Hills" },
     isCurrent: () => host.isConnected, reposition() {} });
 });

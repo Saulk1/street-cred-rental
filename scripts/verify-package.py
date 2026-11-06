@@ -6,7 +6,7 @@ import posixpath
 import re
 from urllib.parse import urlsplit
 from zipfile import ZipFile
-from package import build
+from package import build, build_ui
 
 
 class Resources(HTMLParser):
@@ -24,6 +24,7 @@ class Resources(HTMLParser):
 
 def main():
     root = Path(__file__).resolve().parent.parent
+    build_ui(root)
     manifest, contents, output = build(root)
     pages = [manifest["action"]["default_popup"], manifest["options_page"],
              manifest["side_panel"]["default_path"], "welcome/welcome.html"]

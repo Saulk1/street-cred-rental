@@ -2,7 +2,7 @@
 
 **Beta extension for the Microburbs Hackathon 2026, built by team Street Cred.**
 
-A minimal Manifest V3 Chrome extension made with plain HTML, CSS and JavaScript.
+A Manifest V3 Chrome extension with a React, TypeScript and shadcn/ui interface.
 Version 0.1.0 opens a toolbar popup with a local notepad and buttons for the options
 page, side panel and page widget. It includes matching options and side panel pages,
 and requests the `sidePanel`, `storage` and `contextMenus` API permissions.
@@ -38,7 +38,7 @@ Released under the [MIT License](LICENSE). Copyright © 2026 Street Cred contrib
 ## Install locally
 
 1. Create `.env.local` if it does not exist. Set `MICROBURBS_API_BASE_URL=https://api.microburbs.com.au` and `MICROBURBS_API_KEY` to your team's key. Keep existing local credentials when updating an installation.
-2. Run `python3 scripts/package.py` to generate the local runtime configuration, `dist/unpacked/` and the ZIP. An empty key is supported for development: notes work, and property lookups show setup guidance.
+2. With Node.js 22.12+ installed, run `npm ci`, then `python3 scripts/package.py` to generate the local runtime configuration, `dist/unpacked/` and the ZIP. An empty key is supported for development: notes work, and property lookups show setup guidance.
 3. Open `chrome://extensions` in desktop Chrome and turn on **Developer mode**.
 4. Click **Load unpacked** and choose **`dist/unpacked/`**, which contains the generated manifest.
 5. Pin **Microburbs Facts** from Chrome's Extensions menu and click its icon.
@@ -57,15 +57,15 @@ Keep Developer mode on while using the unpacked extension; current Chrome disabl
 unpacked extensions when it is turned off.
 
 On a fresh installation, a new active tab displays the extension icon and
-**Welcome to Microburbs Facts!** Close the tab normally when finished. The greeting
+the **A closer look at local** introduction Close the tab normally when finished. The greeting
 does not reopen on extension reloads, updates, browser updates or browser restarts.
 Uninstalling and reinstalling counts as a fresh installation and shows it again.
 Existing users receiving an update do not see the welcome tab.
 
 After editing source or `.env.local`, rebuild with `python3 scripts/package.py`,
 click **Reload** on its card in `chrome://extensions`, and reopen the popup.
-Reload existing webpages to refresh their content scripts. No npm install or
-development server is needed for normal use.
+Reload existing webpages to refresh their content scripts. Run `npm ci` once after checkout, or when the lockfile changes. No development
+server is needed for normal use.
 
 If lookup still shows setup guidance after rebuilding, open the extension's
 **Details** in `chrome://extensions` and check **Loaded from**. It must point to
@@ -91,8 +91,7 @@ available with an explanation. If native popover opening fails, the card switche
 to its fixed-position fallback while keeping keyboard and dismissal behavior.
 
 Use **Open options** in the popup to open or focus the options tab. You can also
-right-click the extension's toolbar icon and choose **Options**. The page currently
-displays a heading and icon. Use **Open side panel** to open the matching panel in
+right-click the extension's toolbar icon and choose **Options**. The page provides a branded usage guide and local-note/privacy information. Use **Open side panel** to open the matching panel in
 the current browser window (Chrome 116 or newer).
 
 ### Notepad
@@ -116,8 +115,12 @@ fails, it offers a retry with the same captured text.
 The card does not move focus when it appears. Press **Tab** to focus its Save
 button and **Enter** or **Space** to activate it. **Escape**, clicking outside,
 clearing the selection, scrolling or resizing dismisses the card; change the
-selection to show it again. Near the bottom of the screen it appears above the
-text. Selections in inputs, textareas, editable content and embedded frames are
+selection to show it again. The card first tries the right side of the full
+selection, then the left, with an 8px gap. If neither side fits, it appears below
+all selected lines. When necessary, the page scrolls slightly to keep the address
+and card visible together; temporary scroll space at the document bottom is
+removed when the card closes. Tall results scroll inside the card. Selections
+in inputs, textareas, editable content and embedded frames are
 excluded. The existing right-click menu remains available independently.
 Reload any already-open webpage after reloading the extension to use this feature.
 
@@ -172,31 +175,28 @@ The popup reports failures without leaving rejected promises unhandled.
 Chrome protects some pages,
 including browser settings and the Chrome Web Store, from content script injection.
 
-## Files
+## UI development and runtime files
 
-- `manifest.json`: extension metadata, toolbar action, icons and content security policy.
-- `popup/`: contains `popup.html`, `popup.css` and `popup.js` for the launcher buttons, Chrome API handlers and accessible status feedback.
-- `consts.js`: shared frozen notepad constants loaded by the popup, content scripts and background worker.
-- `options/`: contains `options.html`, `options.css` and `options.js` for the matching options page.
-- `sidepanel/`: contains `sidepanel.html`, `sidepanel.css` and `sidepanel.js` for the matching side panel page.
-- `welcome/`: contains the static greeting page and stylesheet opened on a fresh installation.
-- `content-script/`: contains the existing widget and separate `selection-card.js`/`selection-card.css` for capturing selected page text. Both use Shadow DOM with bundled stylesheets; only those CSS files are web accessible.
-- `background.js`: the extension service worker, which saves selection-card messages, manages note-capture context menus and opens the welcome tab only for a fresh installation.
-- `property-api.js`: worker-only API calls, throttling, safe errors and normalisation of property responses. `content-script/property-lookup.js` renders the expanded lookup card.
-- `icons/`: original PNG artwork in Chrome's required sizes; editable source in `assets/icon.svg`.
-- `store/`: listing draft and screenshot for submission preparation; not extension runtime files.
+- `src/`: React page/injected entries, typed view models, shared tokens and official
+  shadcn components. `components.json` records the Nova/Radix/Lucide configuration.
+- `content-script/`: selection/widget lifecycle controllers and host-only CSS.
+  React renders controls/results inside isolated shadow roots. Native popover and
+  fixed-position fallback behavior are retained.
+- `background.js`, `property-api.js`, `consts.js`: existing worker, API and message
+  contracts. Storage keys and note formats are unchanged.
 
-The extension includes no telemetry. An explicit property lookup sends the
-selected address and the matched property's GNAF ID to the configured Microburbs
-API using the team key; the service's response is displayed in the card. It
-stores manually entered notes and selected text locally only when you
-choose to save them, and retains previously saved URL notes; it does not read
-browsing history. Its content script adds and removes its
-own widget and selection-card DOM without changing the page's existing content.
-The selection card reads the current selection into temporary page memory to
-position its action; it sends that text to the worker for local storage only
-when you click Save. Extension pages'
-content security policy permits only bundled scripts, styles and images.
+`npm run build` creates local self-contained scripts and styles under `.build/`.
+`python3 scripts/package.py` builds them and writes `dist/unpacked/` and the ZIP.
+The root source directory is no longer a loadable extension; load `dist/unpacked/`.
+The allowlist excludes TypeScript, source maps, npm dependencies, skills and tools.
+Only bundled local assets run in Chrome, with the existing CSP and permissions.
+
+For a mock-data property preview, run `npm run build`, serve the repository with
+`python3 -m http.server 8766 --bind 127.0.0.1`, and open
+`http://127.0.0.1:8766/tests/fixtures/property-preview.html`. The preview never
+uses credentials or writes notes. For native selection behavior use the adjacent
+`selection-card.html` fixture with the packaged extension loaded.
+
 
 ## Package
 
@@ -322,9 +322,12 @@ These browser checks await user feedback; automated tests below use mocked APIs.
 
 ## Local checks
 
-Use Node.js 22+ and Python 3; no npm dependencies are required:
+Use Node.js 22.12+ and Python 3. Install dependencies with `npm ci`, then run:
 
 ```sh
+npm run typecheck
+npm run test:ui
+npm run build
 node --test tests/*.test.mjs
 python3 -m unittest discover -s tests -p '*_test.py'
 npm run test:package
@@ -336,8 +339,8 @@ Notepad tests cover persistence, concurrent saves, changes while deleting, stale
 reads, literal text rendering, validation and focus after deletion.
 Content-script tests use mocked Chrome APIs and
 DOM elements to check click-only creation, duplicate prevention, dismissal and
-stylesheet failure/retry behavior. The popup tests use mocked Chrome APIs and DOM
-controls to check dispatch and error handling. Package verification rebuilds the
+stylesheet failure/retry behavior. The React UI tests use mocked Chrome APIs and a real DOM to check dispatch,
+rendering, errors, retries and unmount cleanup. Package verification rebuilds the
 ZIP and compares its runtime files with the source, ensuring development tooling
 stays out. These automated checks complement visible browser checks; they do not
 verify rendering, native toolbar behavior or side panel docking. The click-only
@@ -369,7 +372,39 @@ functionality may be rejected under Chrome Web Store's minimum functionality req
 Add useful functionality before seeking public approval. Nothing has been submitted
 or published. See `store/listing.md` for accurate draft copy and preparation steps.
 
+## Shadcn makeover verification
+
+On 2026-11-06, the installed unpacked extension was reloaded and checked in
+native Chrome. The 360px toolbar popup displayed its shadcn controls and the
+existing saved note. Options opened from the popup, and the side panel opened
+and docked with the shared branded guide. The welcome page and dismissible
+page widget were visually reviewed.
+
+On the selection fixture at 200% page zoom, selecting **26 Tudor Street,
+Surry Hills** showed both actions beside the selection. Tab produced a visible
+focus outline. Live lookup returned address choices; selecting the Sydney match
+loaded facts, valuation and overlays. Expanded results moved below the address,
+kept the complete selected address visible, and scrolled internally with Page
+Down. Escape dismissed the card. Browser zoom was restored using Chrome's Reset
+control. No notes were added or deleted during these checks.
+
+The separate mock-data preview verified unit-address choices, zero parking and
+missing values. Automated React tests cover save/delete errors, concurrent
+changes, draft preservation, storage failures, partial API failures, retry timing,
+stale replies and root cleanup. Controller tests cover selection recovery and
+fallback positioning; package checks validate bundled resources and exclusions.
+Full screen-reader testing, a complete console/CSP inspection, and a Chrome
+restart remain manual checks. Historical checks below predate this makeover.
+
 ## Visible browser checks performed
+
+On 2026-11-06, side placement was checked in visible Chrome on the selection-card
+fixture. At 100% zoom, both the compact card and live results appeared to the
+right of a two-line address without covering either line. At 200% zoom, the
+bottom-edge address first showed the compact card on its left; expanding lookup
+results used the space below and scrolled enough to expose the full address
+above the card. Native context-menu lookup used the same below-address placement.
+User scrolling dismissed the card, and the test page's zoom was restored to 100%.
 
 On 2026-11-06, the rebuilt extension's native context menu was checked in visible
 Chrome on the local selection-card fixture. Right-clicking the selected

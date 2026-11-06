@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import tempfile
 from urllib.parse import urlsplit
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -50,13 +51,21 @@ def read_config(path):
 def runtime_files(manifest):
     files = ["LICENSE", "manifest.json", "consts.js", "property-api.js", "runtime-config.js",
              manifest["background"]["service_worker"], manifest["action"]["default_popup"],
-             "popup/popup.css", "popup/popup.js", manifest["options_page"],
-             "options/options.css", "options/options.js", manifest["side_panel"]["default_path"],
-             "sidepanel/sidepanel.css", "sidepanel/sidepanel.js", "welcome/welcome.html", "welcome/welcome.css",
+             manifest["options_page"], manifest["side_panel"]["default_path"], "welcome/welcome.html",
+             "ui/pages.js", "ui/pages.css", "ui/selection-card.css", "ui/widget.css",
              *manifest["icons"].values(),
              *(filename for script in manifest.get("content_scripts", [])
                for kind in ("js", "css") for filename in script.get(kind, []))]
     return list(dict.fromkeys(files))
+
+
+def build_ui(root):
+    subprocess.run(["npm", "run", "build"], cwd=root, check=True)
+
+
+def runtime_source(root, name):
+    compiled = root / ".build/runtime" / name
+    return compiled if name.startswith("ui/") and compiled.exists() else root / name
 
 
 def build(root, config_path=None):
@@ -71,7 +80,7 @@ def build(root, config_path=None):
         "runtime-config.js": ("// Generated local team configuration. Do not commit.\n"
                               + "globalThis.MICROBURBS_CONFIG = Object.freeze(" + json.dumps(config) + ");\n").encode(),
     }
-    contents = {name: generated[name] if name in generated else (root / name).read_bytes()
+    contents = {name: generated[name] if name in generated else runtime_source(root, name).read_bytes()
                 for name in runtime_files(manifest)}
     dist = root / "dist"
     dist.mkdir(exist_ok=True)
@@ -95,6 +104,7 @@ def build(root, config_path=None):
 
 def main():
     root = Path(__file__).resolve().parent.parent
+    build_ui(root)
     _, _, output = build(root)
     print(f"Created {output.relative_to(root)} and dist/unpacked (local team build)")
     if not read_config(root / ".env.local")["apiKey"]:

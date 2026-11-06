@@ -1,5 +1,20 @@
 # Project instructions
 
+## Mandatory UI standard: shadcn
+
+**All UI component work must use the installed
+`.agents/skills/shadcn/SKILL.md` skill.** Read and follow it when creating,
+editing, styling or composing any UI component across every extension surface.
+
+- Use official shadcn components and compose them for app-specific interfaces.
+- Follow the skill's component discovery, documentation, composition and semantic
+  styling rules.
+- **Do not introduce or use other UI frameworks or component libraries.** The
+  existing React, Tailwind CSS and shadcn Radix primitives remain the approved
+  implementation stack.
+- Modern Web Guidance remains required alongside the shadcn skill for HTML, CSS
+  and client-side JavaScript work.
+
 ## Modern Web Guidance
 
 Use the installed `.agents/skills/modern-web-guidance/SKILL.md` for HTML, CSS and
@@ -30,7 +45,17 @@ Do not describe manual file reads as a successful CLI search.
 
 ## Extension packaging
 
-The extension is plain HTML, CSS and JavaScript. Development tooling belongs outside
-runtime files. Package it with `python3 scripts/package.py`; its allowlist must keep
-`.tools/`, agent instructions and all other development files out of the ZIP.
+The UI uses React, TypeScript, Tailwind v4 and official shadcn Nova/Radix
+components. Read `.agents/skills/shadcn/SKILL.md` for shadcn work. Preserve the
+vanilla selection lifecycle controller and background/API message contracts.
+
+Install dependencies with `npm ci`. Package with `python3 scripts/package.py`,
+which builds the UI first. `npm run build` compiles self-contained page/content
+IIFEs to ignored `.build/` storage; the Python runtime allowlist includes only
+compiled assets, controllers and required extension resources. Keep `.tools/`,
+node_modules, source, agent instructions and all development files out of the ZIP.
+
+Shared UI CSS belongs inside extension pages or shadow roots only. Manifest CSS
+must style only the two injected host IDs. Do not inject Tailwind's global reset
+into webpages, introduce remote runtime assets, or weaken the CSP.
 

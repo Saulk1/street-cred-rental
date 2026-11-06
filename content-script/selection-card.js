@@ -17,6 +17,9 @@
   let styleRequest;
   let stopped = false;
   let popoverUnavailable = false;
+  let clearance;
+  let scrollGuard;
+  let scrollFrame;
   const listeners = new AbortController();
 
   // Only names from this allowlist reach diagnostics. Error messages can contain
@@ -36,7 +39,7 @@
     if (!chrome.runtime?.id) throw new Error("Extension context invalidated");
     // getURL also detects orphaned contexts where a previously cached sheet
     // would otherwise let the old controller keep creating unusable cards.
-    return chrome.runtime.getURL("content-script/selection-card.css");
+    return chrome.runtime.getURL("ui/selection-card.css");
   }
 
   function stopForInvalidContext() {
@@ -49,6 +52,8 @@
     frame = undefined;
     styleRequest?.abort();
     dismiss(false);
+    if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
+    scrollGuard = undefined;
     dismissedSelection = undefined;
     stylesheet = undefined;
     console.error("The extension was reloaded. Reload this webpage to restore the selection card.");
@@ -69,6 +74,16 @@
       || element.closest(`input, textarea, #${cardId}, #microburbs-facts-widget`);
   }
 
+  function rangeRect(range) {
+    const rects = [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0);
+    if (!rects.length) return;
+    const left = Math.min(...rects.map(rect => rect.left));
+    const right = Math.max(...rects.map(rect => rect.right));
+    const top = Math.min(...rects.map(rect => rect.top));
+    const bottom = Math.max(...rects.map(rect => rect.bottom));
+    return { left, right, top, bottom, width: right - left, height: bottom - top };
+  }
+
   function readSelection() {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || selection.rangeCount !== 1
@@ -76,12 +91,10 @@
       || document.activeElement?.matches("input, textarea, [contenteditable]:not([contenteditable='false'])")) return;
     const text = selection.toString();
     if (!text.trim()) return;
-    const range = selection.getRangeAt(0);
-    const rects = [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0);
-    const backwards = selection.focusNode === range.startContainer && selection.focusOffset === range.startOffset;
-    const rect = backwards ? rects[0] : rects.at(-1);
+    const range = selection.getRangeAt(0).cloneRange();
+    const rect = rangeRect(range);
     if (!rect || rect.bottom <= 0 || rect.top >= window.innerHeight) return;
-    return { text, rect, anchorNode: selection.anchorNode, anchorOffset: selection.anchorOffset,
+    return { text, rect, range, anchorNode: selection.anchorNode, anchorOffset: selection.anchorOffset,
       focusNode: selection.focusNode, focusOffset: selection.focusOffset };
   }
 
@@ -89,8 +102,9 @@
     if (remember && currentSelection) dismissedSelection = currentSelection;
     version++;
     if (card) {
-      const { host, lookup, previousFocus } = card;
+      const { host, lookup, saveUI, previousFocus, observer } = card;
       card = undefined;
+      observer?.disconnect();
       try { lookup?.dispose(); } catch (error) {
         report("lookup cleanup", error, "The selection card was removed.");
       }
@@ -99,9 +113,19 @@
           previousFocus?.focus({ preventScroll: true });
         }
       } catch { /* A removed or unfocusable page element must not prevent cleanup. */ }
-      finally { host.remove(); }
+      finally {
+        try { saveUI?.dispose(); } catch (error) {
+          report("save UI cleanup", error, "The selection card was removed.");
+        } finally { host.remove(); }
+      }
     }
     currentSelection = undefined;
+    if (clearance) {
+      const oldY = window.scrollY;
+      clearance.remove();
+      clearance = undefined;
+      if (window.scrollY !== oldY) guardPageScroll();
+    }
   }
 
   function loadStyles(url) {
@@ -118,14 +142,60 @@
     return stylesheet;
   }
 
-  function position(host, rect) {
+  function guardPageScroll() {
+    scrollGuard = { x: window.scrollX, y: window.scrollY };
+    if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
+    // Scroll events caused by our instant scroll arrive before the next paint.
+    scrollFrame = requestAnimationFrame(() => { scrollFrame = undefined; scrollGuard = undefined; });
+  }
+
+  function position(host, selection) {
+    if (card?.host !== host) return;
+    if (selection.anchorNode.isConnected === false || selection.focusNode.isConnected === false) {
+      dismiss();
+      return;
+    }
     const gap = 8;
-    const bounds = host.getBoundingClientRect();
+    const rect = rangeRect(selection.range);
+    if (!rect) { dismiss(); return; }
+    selection.rect = rect;
+    host.style.removeProperty("--selection-card-max-height");
+    let bounds = host.getBoundingClientRect();
     const maxLeft = Math.max(gap, window.innerWidth - bounds.width - gap);
-    const below = rect.bottom + gap;
-    const top = below + bounds.height <= window.innerHeight - gap ? below : rect.top - bounds.height - gap;
-    host.style.left = `${Math.max(gap, Math.min(rect.left, maxLeft))}px`;
-    host.style.top = `${Math.max(gap, Math.min(top, window.innerHeight - bounds.height - gap))}px`;
+    const right = rect.right + gap;
+    const left = rect.left - gap - bounds.width;
+    if (right + bounds.width <= window.innerWidth - gap || left >= gap) {
+      host.style.left = `${right + bounds.width <= window.innerWidth - gap ? Math.max(gap, right) : left}px`;
+      host.style.top = `${Math.max(gap, Math.min(rect.top, window.innerHeight - bounds.height - gap))}px`;
+      return;
+    }
+
+    // A wide selection needs the space below it. Limit tall results so both
+    // the whole address and a scrollable card can share the viewport.
+    host.style.setProperty("--selection-card-max-height", `${Math.max(1, window.innerHeight - rect.height - gap * 3)}px`);
+    bounds = host.getBoundingClientRect();
+    const delta = rect.bottom + gap + bounds.height + gap - window.innerHeight;
+    if (delta > 0) {
+      const target = window.scrollY + delta;
+      const scroller = document.scrollingElement;
+      if (scroller && target > scroller.scrollHeight - scroller.clientHeight) {
+        if (!clearance) {
+          clearance = document.createElement("div");
+          clearance.setAttribute("aria-hidden", "true");
+          clearance.style.cssText = "all:initial!important;position:absolute!important;display:block!important;left:0!important;width:1px!important;height:1px!important;pointer-events:none!important;visibility:hidden!important;";
+          document.documentElement.append(clearance);
+        }
+        // Absolute overflow supplies just enough scroll room without reflowing
+        // the page's flex/grid content or changing its existing elements.
+        clearance.style.setProperty("top", `${target + window.innerHeight - 1}px`, "important");
+      }
+      window.scrollTo({ left: window.scrollX, top: target, behavior: "instant" });
+      guardPageScroll();
+      selection.rect = rangeRect(selection.range) ?? rect;
+    }
+    const below = selection.rect.bottom + gap;
+    host.style.left = `${Math.max(gap, Math.min(selection.rect.left, maxLeft))}px`;
+    host.style.top = `${below}px`;
   }
 
   async function show(selection) {
@@ -135,6 +205,7 @@
     const requestedVersion = version;
     let stage = "extension-context check";
     let host;
+    let saveUI;
     try {
       const url = stylesheetUrl();
       stage = "stylesheet loading";
@@ -149,25 +220,21 @@
       host.dir = "ltr";
       const shadow = host.attachShadow({ mode: "open" });
       shadow.adoptedStyleSheets = [sheet];
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Save to notes";
-      const status = document.createElement("p");
-      status.setAttribute("role", "status");
-      status.setAttribute("aria-atomic", "true");
-      shadow.append(button, status);
+      saveUI = MicroburbsUI.mountSaveAction(shadow);
+      const button = saveUI.button;
+      const saveContainer = shadow.children[0];
       let lookup;
       try {
         stage = "property-lookup attachment";
         lookup = PROPERTY_LOOKUP.attach({ host, shadow, selection,
-          isCurrent: () => card?.host === host, reposition: () => position(host, selection.rect) });
+          isCurrent: () => card?.host === host, reposition: () => position(host, selection) });
       } catch (error) {
         if (invalidated(error)) throw error;
         for (const child of [...shadow.children]) {
-          if (child !== button && child !== status) child.remove();
+          if (child !== saveContainer) child.remove();
         }
         host.removeAttribute("data-expanded");
-        status.textContent = "Property lookup is unavailable. You can still save notes. Reload this webpage to retry lookup.";
+        saveUI.update({ message: "Property lookup is unavailable. You can still save notes. Reload this webpage to retry lookup." });
         report(stage, error, "Save to notes is still available; reload this webpage to retry lookup.", true);
       }
       stage = "card setup";
@@ -177,8 +244,7 @@
       });
       button.addEventListener("click", async () => {
         if (button.disabled) return;
-        button.disabled = true;
-        status.textContent = "";
+        saveUI.update({ disabled: true, message: "" });
         try {
           stylesheetUrl();
           const response = await chrome.runtime.sendMessage({
@@ -186,17 +252,15 @@
           });
           if (!response?.ok) throw new Error("Save unavailable.");
           if (card?.host !== host) return;
-          button.textContent = "Saved to notes";
-          status.textContent = "Note saved.";
+          saveUI.update({ saved: true, message: "Note saved." });
         } catch (error) {
           if (invalidated(error)) { stopForInvalidContext(); return; }
           if (card?.host !== host) return;
-          button.disabled = false;
-          status.textContent = "Could not save. Try again.";
+          saveUI.update({ disabled: false, message: "Could not save. Try again." });
         }
-        if (card?.host === host) position(host, selection.rect);
+        if (card?.host === host) position(host, selection);
       });
-      card = { host, button, lookup, previousFocus: document.activeElement, nativePopover: false };
+      card = { host, button, lookup, saveUI, previousFocus: document.activeElement, nativePopover: false };
       stage = "card insertion";
       document.documentElement.append(host);
       const usePopover = !popoverUnavailable && "popover" in HTMLElement.prototype && typeof host.showPopover === "function";
@@ -220,12 +284,17 @@
         }
       }
       stage = "card positioning";
-      position(host, selection.rect);
+      position(host, selection);
+      if (card?.host === host && typeof ResizeObserver === "function") {
+        card.observer = new ResizeObserver(() => position(host, selection));
+        card.observer.observe(host);
+      }
       return card;
     } catch (error) {
-      if (invalidated(error)) { stopForInvalidContext(); host?.remove(); return; }
+      if (invalidated(error)) { stopForInvalidContext(); saveUI?.dispose(); host?.remove(); return; }
       if (requestedVersion === version) {
         dismiss(false);
+        saveUI?.dispose();
         host?.remove();
         report(stage, error, stage === "stylesheet loading"
           ? "Could not load bundled card styles. Reload the extension and this webpage, then retry."
@@ -305,6 +374,8 @@
   }, true);
   // Capture scrolls in nested containers as well as scrolling the main document.
   listen(document, "scroll", event => {
+    const pageScroll = event.target === document || event.target === document.scrollingElement;
+    if (pageScroll && scrollGuard && window.scrollX === scrollGuard.x && window.scrollY === scrollGuard.y) return;
     if (!card || !event.composedPath().includes(card.host)) { contextSelection = undefined; dismiss(); }
   }, true);
   listen(window, "resize", () => { contextSelection = undefined; dismiss(); });

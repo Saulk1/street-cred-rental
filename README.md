@@ -3,11 +3,13 @@
 **Beta extension for the Microburbs Hackathon 2026, built by team Street Cred.**
 
 A minimal Manifest V3 Chrome extension made with plain HTML, CSS and JavaScript.
-Version 0.1.0 opens a toolbar popup with buttons for the options page, side panel
-and page widget. It includes matching options and side panel pages, and requests only the
-`sidePanel` API permission. A content script waits for **Show page widget** before
+Version 0.1.0 opens a toolbar popup with a local notepad and buttons for the options
+page, side panel and page widget. It includes matching options and side panel pages,
+and requests the `sidePanel`, `storage` and `contextMenus` API permissions.
+A content script waits for **Show page widget** before
 adding a dismissible widget to an ordinary HTTP or HTTPS page; its manifest match
 patterns request access to those sites.
+Selecting regular page text also reveals a compact **Save to notes** card.
 
 ## Microburbs Hackathon 2026
 
@@ -57,6 +59,40 @@ right-click the extension's toolbar icon and choose **Options**. The page curren
 displays a heading and icon. Use **Open side panel** to open the matching panel in
 the current browser window (Chrome 116 or newer).
 
+### Notepad
+
+Type into **New note** and click **Save note**. Saved notes appear newest first
+in the scrollable list below the editor. Each **Delete** button immediately removes
+that note. Blank notes are rejected; line breaks and other entered text are
+preserved. Notes are displayed as plain text, including saved URLs.
+
+Right-click selected text and choose **Save selected text to notes**, or right-click
+the page background and choose **Save page URL to notes**. The URL action saves
+the current page URL, rather than a clicked link or an embedded frame URL. Both
+actions work while the popup is closed. Reopen it to see captured notes; an open
+popup also refreshes when notes change.
+
+On an ordinary HTTP or HTTPS page, select text with the mouse or keyboard to
+show a **Save to notes** card beside the selection. Click it to save the selected
+text, then open the toolbar popup to view or delete the note. The card confirms
+success and blocks repeated saves until you make a new selection. If saving
+fails, it offers a retry with the same captured text.
+
+The card does not move focus when it appears. Press **Tab** to focus its Save
+button and **Enter** or **Space** to activate it. **Escape**, clicking outside,
+clearing the selection, scrolling or resizing dismisses the card; change the
+selection to show it again. Near the bottom of the screen it appears above the
+text. Selections in inputs, textareas, editable content and embedded frames are
+excluded. The existing right-click menu remains available independently.
+Reload any already-open webpage after reloading the extension to use this feature.
+
+Notes stay in this Chrome profile through extension reloads and browser restarts;
+they are not synced or sent to a server. Uninstalling the extension removes them.
+Drafts are saved only by clicking **Save note** and are lost when the popup closes.
+A failed save preserves the open editor's text and allows retrying; a failed delete
+retains the note. Context-menu failures are logged in the extension worker console
+without the captured contents. Storage is subject to Chrome's local-storage quota.
+
 To see the page widget, open an ordinary HTTP or HTTPS web page, then click
 **Show page widget** in the popup. A **Microburbs Facts** card appears in the
 bottom-right corner only after that click. Use its close button to hide it;
@@ -72,17 +108,22 @@ including browser settings and the Chrome Web Store, from content script injecti
 
 - `manifest.json`: extension metadata, toolbar action, icons and content security policy.
 - `popup/`: contains `popup.html`, `popup.css` and `popup.js` for the launcher buttons, Chrome API handlers and accessible status feedback.
+- `consts.js`: shared frozen notepad constants loaded by the popup, content scripts and background worker.
 - `options/`: contains `options.html`, `options.css` and `options.js` for the matching options page.
 - `sidepanel/`: contains `sidepanel.html`, `sidepanel.css` and `sidepanel.js` for the matching side panel page.
 - `welcome/`: contains the static greeting page and stylesheet opened on a fresh installation.
-- `content-script/`: contains `content-script.js` and `content-script.css` for the widget and its show-message handler, matching the popup and options colours and typography. CSS is registered in the manifest and loaded into the widget's Shadow DOM; only the CSS file is web accessible.
-- `background.js`: the extension service worker, which opens the welcome tab only for a fresh installation and logs tab-creation failures without retrying.
+- `content-script/`: contains the existing widget and separate `selection-card.js`/`selection-card.css` for capturing selected page text. Both use Shadow DOM with bundled stylesheets; only those CSS files are web accessible.
+- `background.js`: the extension service worker, which saves selection-card messages, manages note-capture context menus and opens the welcome tab only for a fresh installation.
 - `icons/`: original PNG artwork in Chrome's required sizes; editable source in `assets/icon.svg`.
 - `store/`: listing draft and screenshot for submission preparation; not extension runtime files.
 
-The extension makes no external network requests, reads no page text or browsing history,
-stores no data and includes no telemetry. Its content script adds and removes its
-own widget DOM without changing the page's existing content. Extension pages'
+The extension makes no external network requests and includes no telemetry. It
+stores manually entered notes, selected text and page URLs locally only when you
+choose to save them; it does not read browsing history. Its content script adds and removes its
+own widget and selection-card DOM without changing the page's existing content.
+The selection card reads the current selection into temporary page memory to
+position its action; it sends that text to the worker for local storage only
+when you click Save. Extension pages'
 content security policy permits only bundled scripts, styles and images.
 
 ## Package
@@ -208,14 +249,15 @@ These browser checks await user feedback; automated tests below use mocked APIs.
 Use Node.js 22+ and Python 3; no npm dependencies are required:
 
 ```sh
-node --test tests/background.test.mjs
-node --test tests/content-script.test.mjs
-node --test tests/popup.test.mjs
+node --test tests/*.test.mjs
 npm run test:package
 ```
 
-The background tests use mocked Chrome APIs to check install-only welcome-tab
-creation and failure handling. Content-script tests use mocked Chrome APIs and
+The background tests use mocked Chrome APIs to check welcome-tab behavior, menu
+creation on install/update, text/URL capture, worker restarts and failure handling.
+Notepad tests cover persistence, concurrent saves, changes while deleting, stale
+reads, literal text rendering, validation and focus after deletion.
+Content-script tests use mocked Chrome APIs and
 DOM elements to check click-only creation, duplicate prevention, dismissal and
 stylesheet failure/retry behavior. The popup tests use mocked Chrome APIs and DOM
 controls to check dispatch and error handling. Package verification rebuilds the
@@ -223,6 +265,14 @@ ZIP and compares its runtime files with the source, ensuring development tooling
 stays out. These automated checks complement visible browser checks; they do not
 verify rendering, native toolbar behavior or side panel docking. The click-only
 widget behavior awaits user feedback from the manual checklist above.
+
+Selection-card tests cover mouse/keyboard selection, editable-field exclusions,
+dismissal, viewport positioning, duplicate-save prevention, stale save/style
+responses, retry and integration with the background save handler. The background
+tests also verify selection-message sender validation and responses after persistence.
+For manual checks, run `python3 -m http.server 8766 --bind 127.0.0.1` from this
+repository and open `http://127.0.0.1:8766/tests/fixtures/selection-card.html` in
+Chrome with the extension loaded. This development fixture is excluded from the ZIP.
 
 ## Publication status
 
@@ -233,11 +283,29 @@ or published. See `store/listing.md` for accurate draft copy and preparation ste
 
 ## Visible browser checks performed
 
+On 2026-11-06, the selection card was checked in visible Chrome on the local
+verification page. Selecting text showed the card, clicking Save preserved the
+selection and showed success, and the note appeared in the native toolbar popup.
+Textarea and editable-content selections showed no card. Tab focused Save with a
+visible focus ring; Enter saved the note. Escape and scrolling dismissed the card,
+and a selection at the bottom of the viewport placed it above the text.
+Only the notes created during these checks were deleted; existing notes were kept.
+The fallback without native popovers, asynchronous failure/retry and stale-response
+handling are covered by automated tests rather than these visible checks.
+
 The popup sizing fix was subsequently checked on 2026-11-06 in visible Chrome.
 A definite 320px root width replaces the viewport-dependent sizing that collapsed
 the native popup into a narrow column. The actual toolbar popup now shows the
 heading, all three buttons, keyboard focus outlines and wrapped error feedback
 within its bounds; Escape dismissal and options/side panel opening were checked.
+
+The notepad was also checked on 2026-11-06 in the native toolbar popup in visible
+Chrome: multiline and Unicode text, literal HTML-like text, long-URL wrapping,
+list scrolling, reopening saved notes, persistence through extension reload,
+keyboard deletion and editor focus after deleting the final note, and selected-text
+and page-URL context-menu capture passed. Options and side-panel opening and widget
+success feedback also passed. All notes created for these checks were removed.
+A full Chrome restart remains a manual check.
 The popup document and its error message also fit when opened in a tab at 200%
 zoom. Chrome kept the native toolbar popup at its own default scale during that
 tab zoom check, so this is not evidence of a native popup rendered at 200%.

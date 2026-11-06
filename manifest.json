@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Microburbs Facts",
   "version": "0.1.0",
-  "description": "Open Microburbs Facts options, side panel and page widget from the toolbar popup.",
+  "description": "Keep local notes, save selected text and page URLs, and open Microburbs Facts tools from the popup.",
   "background": {
     "service_worker": "background.js"
   },
@@ -10,19 +10,19 @@
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },
-  "permissions": ["sidePanel"],
+  "permissions": ["sidePanel", "storage", "contextMenus"],
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content-script/content-script.js"],
-      "css": ["content-script/content-script.css"],
+      "js": ["consts.js", "content-script/content-script.js", "content-script/selection-card.js"],
+      "css": ["content-script/content-script.css", "content-script/selection-card.css"],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content-script/content-script.css"],
+      "resources": ["content-script/content-script.css", "content-script/selection-card.css"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ],

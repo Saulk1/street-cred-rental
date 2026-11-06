@@ -75,14 +75,78 @@ button:hover:enabled {
   background: #e7eee8;
 }
 
-button:focus-visible {
+button:focus-visible,
+textarea:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
-button:disabled {
+button:disabled,
+button[aria-disabled="true"] {
   opacity: 0.6;
   cursor: default;
+}
+
+.notepad,
+#note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-inline-size: 0;
+}
+
+.notepad {
+  border-block-start: 1px solid #bccdc3;
+  padding-block-start: 0.75rem;
+}
+
+h2,
+h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+h3 {
+  margin-block-start: 0.25rem;
+  font-size: 0.875rem;
+}
+
+textarea {
+  inline-size: 100%;
+  min-block-size: 4.5rem;
+  max-block-size: 12rem;
+  resize: vertical;
+  padding: 0.5rem;
+  border: 1px solid var(--color-text);
+  border-radius: 0.375rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+#notes-empty {
+  margin: 0;
+}
+
+#notes-list {
+  max-block-size: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem 0.25rem 0.25rem 1.5rem;
+}
+
+#notes-list li {
+  padding-block: 0.5rem;
+}
+
+#notes-list li + li {
+  border-block-start: 1px solid #bccdc3;
+}
+
+.note-content {
+  margin: 0 0 0.5rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 #status {

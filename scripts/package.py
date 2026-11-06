@@ -12,6 +12,7 @@ def main():
     files = [
         "LICENSE",
         "manifest.json",
+        "consts.js",
         manifest["background"]["service_worker"],
         manifest["action"]["default_popup"],
         "popup/popup.css",
@@ -28,6 +29,8 @@ def main():
         *(filename for script in manifest.get("content_scripts", [])
           for kind in ("js", "css") for filename in script.get(kind, [])),
     ]
+    # A runtime file can be shared by extension pages and content scripts.
+    files = list(dict.fromkeys(files))
     # Validate before creating or replacing the archive.
     for filename in files:
         if not (root / filename).is_file():

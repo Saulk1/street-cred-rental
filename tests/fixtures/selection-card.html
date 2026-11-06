@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Selection card verification</title>
+    <style>
+      body { margin: 24px; color: #173f35; font: 18px/1.6 system-ui, sans-serif; }
+      main { max-width: 720px; }
+      label { display: block; margin-top: 24px; }
+      textarea { display: block; width: 100%; font: inherit; }
+      [contenteditable] { border: 1px solid; padding: 8px; }
+      .bottom { margin-top: 70vh; text-align: right; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Selection card verification</h1>
+      <p>Select this sentence to save a note from the page.</p>
+      <p>Multiline selection includes Unicode: 中文 and literal markup: &lt;b&gt;plain text&lt;/b&gt;.
+        Select across these sentences to check wrapping and card placement.</p>
+      <a href="#bottom">Jump to bottom text</a>
+      <label for="editable">Textarea selection must not show a card</label>
+      <textarea id="editable" rows="2">Editable text is excluded from the selection card.</textarea>
+      <p contenteditable="true" role="textbox" aria-label="Editable content">Editable content is also excluded.</p>
+      <p class="bottom" id="bottom">Bottom edge selection should flip the card above this text.</p>
+    </main>
+  </body>
+</html>

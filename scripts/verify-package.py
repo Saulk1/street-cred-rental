@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 import json
 from pathlib import Path, PurePosixPath
 import posixpath
+import re
 import subprocess
 import sys
 from urllib.parse import urlsplit
@@ -31,6 +32,14 @@ def main():
              manifest["side_panel"]["default_path"], "welcome/welcome.html"]
     expected = {"LICENSE", "manifest.json", manifest["background"]["service_worker"], *pages,
                 *manifest["icons"].values(), *manifest["action"]["default_icon"].values()}
+    worker = manifest["background"]["service_worker"]
+    worker_source = (root / worker).read_text(encoding="utf-8")
+    # This classic worker uses single bundled paths in importScripts calls.
+    for resource in re.findall(r'importScripts\(["\']([^"\']+)["\']\)', worker_source):
+        filename = posixpath.normpath(posixpath.join(posixpath.dirname(worker), resource))
+        if urlsplit(resource).scheme or PurePosixPath(filename).is_absolute() or ".." in PurePosixPath(filename).parts:
+            raise ValueError(f"Expected a bundled worker import: {resource}")
+        expected.add(filename)
     for script in manifest.get("content_scripts", []):
         for kind in ("js", "css"):
             expected.update(script.get(kind, []))

@@ -34,12 +34,3 @@ The extension is plain HTML, CSS and JavaScript. Development tooling belongs out
 runtime files. Package it with `python3 scripts/package.py`; its allowlist must keep
 `.tools/`, agent instructions and all other development files out of the ZIP.
 
-## Git commits and pushes
-
-Use Git CLI to commit and push this project to
-`https://github.com/sibo-zhang25/microburbs-facts.git`. Preserve the remote history
-and review staged files before committing. Do not force-push.
-
-If terminal network access or authentication fails, report the exact blocker and
-the terminal step needed to resolve it. Do not fall back to browser file uploads
-or GitHub Contents API uploads.

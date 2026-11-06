@@ -1,0 +1,74 @@
+/* Manifest injection styles only this host, leaving the page's styles intact. */
+#microburbs-facts-widget {
+  all: initial;
+  --color-background: #fafbf8;
+  --color-text: #173f35;
+  display: block;
+  position: fixed;
+  inset-inline-end: 1rem;
+  inset-block-end: 1rem;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  inline-size: min(18rem, calc(100vw - 2rem));
+  max-block-size: calc(100dvh - 2rem);
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid #d5e2dc;
+  border-radius: 0.75rem;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  box-shadow: 0 0.25rem 1.5rem #173f3526;
+}
+
+/* Do not show unstyled contents while the bundled stylesheet is loading. */
+#microburbs-facts-widget[hidden] {
+  display: none;
+}
+
+/* These selectors apply only when the sheet is adopted inside the shadow root. */
+:host header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+:host h2 {
+  min-inline-size: 0;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+:host p {
+  margin: 0.5rem 0 0;
+}
+
+:host button {
+  flex: none;
+  min-inline-size: 2.75rem;
+  min-block-size: 2.75rem;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+:host button:hover {
+  background: #e7eee8;
+}
+
+:host button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}

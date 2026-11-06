@@ -1,0 +1,36 @@
+:root {
+  color-scheme: light;
+  --color-background: #fafbf8;
+  --color-text: #173f35;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-inline-size: 40rem;
+  margin-inline: auto;
+  padding: 1.5rem;
+}
+
+img {
+  flex: none;
+  inline-size: 3rem;
+  block-size: 3rem;
+}
+
+h1 {
+  min-inline-size: 0;
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}

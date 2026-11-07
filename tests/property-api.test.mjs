@@ -129,3 +129,67 @@ test("network failures, invalid JSON and timeouts have safe retryable messages",
   app.expire();
   assert.equal((await pending).error.code, "timeout");
 });
+
+// Field shapes derived from assets/microburbs-hackathon-api.yaml; all values
+// below are invented fixture data and never use the team's API credentials.
+const extraFixture = JSON.parse(await readFile(new URL('./fixtures/property-sections.json', import.meta.url), 'utf8'));
+test('extra sections use fixed YAML endpoint paths and normalize only display fields', async () => {
+  const app = client(url => {
+    const path = new URL(url).pathname;
+    const key = path.endsWith('sale-history-latest') ? 'sale' : path.endsWith('rent-history-latest') ? 'rent'
+      : path.includes('development') ? 'planning' : path.includes('schools') ? 'schools' : path.includes('amenities') ? 'amenities' : 'transport';
+    return reply(extraFixture[key]);
+  });
+  const market = await app.api.extra('GANSW1', 'market');
+  assert.equal(market.market.sale.data.type, 'For Sale');
+  assert.equal(market.market.rent.data.price, 3000);
+  const expected = { planning: '/development/all', schools: '/schools/nearby', amenities: '/amenities/nearby?radius_m=1000', transport: '/transport/nearby?radius_m=1000' };
+  for (const [key, path] of Object.entries(expected)) {
+    const result = await app.api.extra('GANSW1', key);
+    assert.equal(result.section.status, 'ok');
+    assert.ok(app.calls.at(-1).url.endsWith(path));
+    assert.ok(!JSON.stringify(result).includes('center_lat'));
+  }
+  assert.equal(app.calls.length, 6);
+  const planning = await app.api.extra('GANSW1', 'planning');
+  assert.deepEqual(Array.from(planning.section.data.zoning_overlays, r => r.value), ['10 m', '5.5 m', '1.5', 'Original unit']);
+});
+test('invalid section, ID and market part cannot become arbitrary API paths', async () => {
+  const app = client(() => { throw new Error('No request expected'); });
+  for (const args of [['../id', 'schools'], ['GANSW1', '../profile'], ['GANSW1', '__proto__'], ['GANSW1', 'market', 'https://external.example'], ['GANSW1', 'schools', 'sale']]) {
+    assert.equal((await app.api.extra(...args)).error.code, 'validation');
+  }
+  assert.equal(app.calls.length, 0);
+});
+test('market failures preserve the other observation and targeted retry requests only the failed part', async () => {
+  const app = client(url => url.endsWith('/rent-history-latest') ? reply(null, 503) : reply(extraFixture.sale));
+  const result = await app.api.extra('GANSW1', 'market');
+  assert.equal(result.market.sale.status, 'ok'); assert.equal(result.market.rent.status, 'error');
+  await app.api.extra('GANSW1', 'market', 'rent');
+  assert.equal(app.calls.length, 3); assert.ok(app.calls.at(-1).url.endsWith('/rent-history-latest'));
+});
+test('extra sections preserve zero counts, nullable fields and distinguish empty from malformed data', async () => {
+  assert.equal((await client(() => reply(null)).api.extra('GANSW1', 'planning')).section.status, 'empty');
+  assert.equal((await client(() => reply([])).api.extra('GANSW1', 'schools')).section.data.length, 0);
+  for (const key of ['planning', 'schools', 'amenities', 'transport']) {
+    assert.equal((await client(() => reply('not a valid payload')).api.extra('GANSW1', key)).section.error.code, 'response');
+  }
+  const transport = await client(() => reply(extraFixture.transport)).api.extra('GANSW1', 'transport');
+  assert.equal(transport.section.data.counts.ferry, 0); assert.equal(transport.section.data.nearest.ferry, null);
+  assert.equal(transport.section.data.nearest.bus.name, null);
+  const schools = await client(() => reply([{ name: 'Far', distance_m: 900 }, null, { name: 'At address', distance_m: 0 }, { name: 'Unknown', distance_m: -1 }])).api.extra('GANSW1', 'schools');
+  assert.deepEqual(Array.from(schools.section.data, r => r.distance_m), [0, 900, null]);
+});
+test('additional section requests share throttling, Retry-After and in-flight coalescing', async () => {
+  const app = client(() => reply(extraFixture.schools));
+  await Promise.all([app.api.extra('GANSW1', 'schools'), app.api.extra('GANSW1', 'schools')]);
+  assert.equal(app.calls.length, 1);
+  let limited = true;
+  const rate = client(() => limited ? reply(null, 429, { 'Retry-After': '2' }) : reply(extraFixture.transport));
+  const result = await rate.api.extra('GANSW1', 'schools');
+  assert.equal(result.section.error.code, 'rate_limit');
+  assert.equal((await rate.api.extra('GANSW1', 'transport')).section.error.code, 'rate_limit');
+  assert.equal(rate.calls.length, 1);
+  rate.advance(2001); limited = false;
+  assert.equal((await rate.api.extra('GANSW1', 'transport')).section.status, 'ok');
+});

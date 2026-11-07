@@ -89,7 +89,7 @@
   button, textarea { font-family: inherit; }
   button:not(:disabled):not([aria-disabled="true"]) { cursor: pointer; }
   :where(button, a, textarea, [tabindex]):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-  [hidden] { display: none !important; }
+  [hidden]:not([hidden="until-found"]) { display: none !important; }
 }
 html:has(body[data-page="popup"]) { inline-size: 360px; }
 .popup-shell { display: flex; flex-direction: column; gap: 18px; padding: 20px; }
@@ -154,3 +154,14 @@ body[data-page="sidepanel"] .guide-intro h1 { font-size: 28px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media (pointer: coarse) { button[data-slot="button"] { min-height: 44px; min-width: 44px; } }
 @media (forced-colors: active) { [data-slot="card"] { border: 1px solid CanvasText; } }
+
+.property-extras { min-width: 0; }
+.property-extras h3 { margin-bottom: 0; }
+.extra-content { padding-block: 4px 14px; }
+.extra-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.extra-list { display: flex; flex-direction: column; gap: 12px; list-style: none; }
+.extra-list li { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.extra-list li > span, .extra-list li > p { color: var(--muted-foreground); font-size: 12px; }
+.extra-list strong { font-size: 13px; font-weight: 600; }
+.property-extras [data-slot="accordion-trigger"] { min-height: 44px; }
+.property-extras [hidden="until-found"] { animation: none; }

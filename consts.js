@@ -11,5 +11,7 @@ const NOTEPAD = Object.freeze({
     LOOK_UP_SELECTION: "LOOK_UP_SELECTION",
     SEARCH_ADDRESS: "SEARCH_ADDRESS",
     PROPERTY_DETAILS: "PROPERTY_DETAILS",
+    PROPERTY_SECTION: "PROPERTY_SECTION",
   }),
+  PROPERTY_SECTIONS: Object.freeze(["market", "planning", "schools", "amenities", "transport"]),
 });

@@ -1,0 +1,157 @@
+{
+  "id": "09434099-da5c-4347-aed8-a798aaf2b617",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.energy_reports": {
+      "name": "energy_reports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "year": {
+          "name": "year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fy": {
+          "name": "fy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "report_date": {
+          "name": "report_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_category": {
+          "name": "report_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "co2": {
+          "name": "co2",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "co2_scope1": {
+          "name": "co2_scope1",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "co2_scope2": {
+          "name": "co2_scope2",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mwh": {
+          "name": "mwh",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gj": {
+          "name": "gj",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "energy_reports_code_category_year_idx": {
+          "name": "energy_reports_code_category_year_idx",
+          "columns": [
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "report_category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "year",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "energy_reports_id_positive": {
+          "name": "energy_reports_id_positive",
+          "value": "\"energy_reports\".\"id\" > 0"
+        },
+        "energy_reports_year_valid": {
+          "name": "energy_reports_year_valid",
+          "value": "\"energy_reports\".\"year\" between 1 and 9999"
+        },
+        "energy_reports_fy_format": {
+          "name": "energy_reports_fy_format",
+          "value": "\"energy_reports\".\"fy\" ~ '^[0-9]{4}-[0-9]{2}$'"
+        },
+        "energy_reports_category_not_blank": {
+          "name": "energy_reports_category_not_blank",
+          "value": "length(trim(\"energy_reports\".\"report_category\")) > 0"
+        },
+        "energy_reports_code_not_blank": {
+          "name": "energy_reports_code_not_blank",
+          "value": "length(trim(\"energy_reports\".\"code\")) > 0"
+        },
+        "energy_reports_name_not_blank": {
+          "name": "energy_reports_name_not_blank",
+          "value": "length(trim(\"energy_reports\".\"name\")) > 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

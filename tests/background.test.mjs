@@ -297,3 +297,28 @@ test("real worker property handlers return setup feedback with no configuration 
   }
   assert.deepEqual(app.store.data, {});
 });
+
+test('additional property section messages validate sender, section, ID and optional market part', async () => {
+  const app = background();
+  for (const [message, sender] of [
+    [{ type: 'PROPERTY_SECTION', id: 'GANSW1', section: 'schools' }, { ...cardSender, id: 'untrusted' }],
+    [{ type: 'PROPERTY_SECTION', id: 'GANSW1', section: 'schools' }, { ...cardSender, frameId: 1 }],
+    [{ type: 'PROPERTY_SECTION', id: 'GANSW1', section: 'schools' }, { ...cardSender, tab: undefined }],
+    [{ type: 'PROPERTY_SECTION', id: '../path', section: 'schools' }, cardSender],
+    [{ type: 'PROPERTY_SECTION', id: 'GANSW1', section: 'https://external.example' }, cardSender],
+    [{ type: 'PROPERTY_SECTION', id: 'GANSW1', section: '__proto__' }, cardSender],
+    [{ type: 'PROPERTY_SECTION', id: 'GANSW1', section: 'schools', part: 'sale' }, cardSender],
+    [{ type: 'PROPERTY_SECTION', id: 'GANSW1', section: 'market', part: '../path' }, cardSender],
+  ]) {
+    let response;
+    assert.equal(app.message(message, sender, value => { response = value; }), undefined);
+    assert.equal(response.ok, false);
+  }
+  for (const section of ['market', 'planning', 'schools', 'amenities', 'transport']) {
+    const result = await new Promise(resolve => {
+      assert.equal(app.message({ type: 'PROPERTY_SECTION', id: 'GANSW1', section }, cardSender, resolve), true);
+    });
+    for (const part of section === 'market' ? Object.values(result.market) : [result.section]) assert.equal(part.error.code, 'configuration');
+  }
+  assert.deepEqual(app.store.data, {});
+});

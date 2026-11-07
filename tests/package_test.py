@@ -32,6 +32,7 @@ class PackageTests(unittest.TestCase):
             self.assertIn(b'dummy-key', contents['runtime-config.js'])
             self.assertFalse(any(name.endswith('.yaml') or '.env' in name or name.startswith('tests/') for name in contents))
             self.assertFalse(any(name.startswith(("src/", ".build/", "node_modules/", ".agents/", ".tools/")) or name.endswith((".tsx", ".map")) for name in contents))
+            self.assertIn(b'globalThis.DATA_API_CONFIG = Object.freeze({"baseUrl": ""})', contents['runtime-config.js'])
             self.assertIn("ui/injected.js", contents)
             self.assertIn("ui/selection-card.css", contents)
             self.assertNotIn(b"@import", contents["ui/pages.css"])
@@ -51,7 +52,7 @@ class PackageTests(unittest.TestCase):
     def test_missing_key_is_supported(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / '.env.local'
-            self.assertEqual(pack.read_config(path), {'baseUrl': '', 'apiKey': ''})
+            self.assertEqual(pack.read_config(path), {'baseUrl': '', 'apiKey': '', 'dataApiBaseUrl': ''})
             path.write_text('export MICROBURBS_API_BASE_URL=https://api.example.test/\nMICROBURBS_API_KEY=\n')
             self.assertEqual(pack.read_config(path)['apiKey'], '')
 
@@ -67,6 +68,59 @@ class PackageTests(unittest.TestCase):
             path.write_text('MICROBURBS_API_KEY="unclosed')
             with self.assertRaises(ValueError):
                 pack.read_config(path)
+
+    def test_data_api_origins_and_database_exclusion(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = json.loads((ROOT / 'manifest.json').read_text())
+            for name in pack.runtime_files(manifest):
+                if name == 'runtime-config.js':
+                    continue
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(pack.runtime_source(ROOT, name).read_bytes())
+            for name in ['api/health.ts', 'server/db/index.ts', 'drizzle/0000.sql',
+                         'data/first.csv', 'data/second.csv', '.env.server.local']:
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('server-only-marker')
+            env = root / '.env.local'
+            for microburbs, data, expected in [
+                ('', '', []),
+                ('https://microburbs.example.test', '', ['https://microburbs.example.test']),
+                ('', 'https://data.example.test/', ['https://data.example.test']),
+                ('https://microburbs.example.test', 'https://data.example.test:443',
+                 ['https://microburbs.example.test', 'https://data.example.test']),
+                ('https://same.example.test', 'https://same.example.test', ['https://same.example.test']),
+            ]:
+                with self.subTest(microburbs=microburbs, data=data):
+                    env.write_text(f'MICROBURBS_API_BASE_URL={microburbs}\nDATA_API_BASE_URL={data}\n'
+                                   'DATABASE_URL=postgresql://dummy-runtime-secret\n'
+                                   'DATABASE_MIGRATION_URL=postgresql://dummy-owner-secret\n')
+                    generated, contents, archive = pack.build(root)
+                    self.assertEqual(generated.get('host_permissions', []), [origin + '/*' for origin in expected])
+                    directive = "connect-src " + (' '.join(expected) if expected else "'none'")
+                    self.assertEqual(generated['content_security_policy']['extension_pages'].split('; ')[-1], directive)
+                    self.assertIn(b'globalThis.DATA_API_CONFIG', contents['runtime-config.js'])
+                    with ZipFile(archive) as zipped:
+                        self.assertEqual(set(zipped.namelist()), set(pack.runtime_files(manifest)))
+                        for name in zipped.namelist():
+                            for secret in [b'dummy-runtime-secret', b'dummy-owner-secret', b'server-only-marker']:
+                                self.assertNotIn(secret, zipped.read(name))
+                            self.assertFalse(name.startswith(('api/', 'server/', 'drizzle/', 'data/')))
+                            self.assertFalse(name.endswith(('.csv', '.tsv')))
+
+    def test_invalid_data_api_origin_is_rejected_without_echoing_values(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / '.env.local'
+            for origin in ['http://data.example.test', 'https://secret@data.example.test',
+                           'https://data.example.test/path', 'https://data.example.test?secret',
+                           'https://data.example.test#secret', 'https://data.example.test:444',
+                           'https://data.example.test:secret', 'https://[secret]', 'https://data.example.test\t']:
+                path.write_text('DATA_API_BASE_URL="' + origin + '"')
+                with self.subTest(origin=origin), self.assertRaises(ValueError) as raised:
+                    pack.read_config(path)
+                self.assertNotIn('secret', str(raised.exception))
 
 
 if __name__ == '__main__':

@@ -1,28 +1,18 @@
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { useEffect, useState } from 'react';
-import { MapPinIcon, SearchIcon, ArrowLeftIcon, TriangleAlertIcon } from 'lucide-react';
+import { MapPinIcon, SearchIcon, ArrowLeftIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import type { Candidate, Sections, LookupError, LookupResponse, Risks } from '@/types';
 
 type LookupState = { phase: 'idle' | 'loading' | 'choices' | 'empty' | 'details' | 'error'; candidates: Candidate[]; candidate?: Candidate; sections?: Sections; error?: LookupError; announcement: string };
-const absent = 'Not available';
-const value = (input: unknown) => input === null || input === undefined ? absent : String(input);
-const money = (input: number | null | undefined) => typeof input === 'number' ? new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(input) : absent;
-function Rows({ entries }: { entries: [string, string][] }) { return <dl className="fact-grid">{entries.map(([label, display]) => <div key={label}><dt>{label}</dt><dd>{display}</dd></div>)}</dl>; }
-function Retry({ error, retry }: { error?: LookupError; retry: () => void }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const delay = Math.max(0, (error?.retryAt ?? 0) - Date.now()); if (!delay) return; const timer = setTimeout(() => setNow(Date.now()), Math.min(delay, 2147483647)); return () => clearTimeout(timer); }, [error?.retryAt, now]);
-  const waiting = (error?.retryAt ?? 0) > now;
-  return <Alert variant="destructive" role="group"><TriangleAlertIcon aria-hidden="true" /><AlertDescription><p>{error?.message ?? 'Could not look up this property. Please retry.'}</p>{error?.requestId && <p>Request ID: {error.requestId}</p>}{waiting && <p>Retry available after {new Date(error!.retryAt!).toLocaleTimeString()}.</p>}<Button variant="outline" disabled={waiting} onClick={retry}>Retry</Button></AlertDescription></Alert>;
-}
+import { absent, displayValue as value, money, Rows, Retry } from '@/components/property-feedback';
+import { PropertyExtras } from '@/components/property-extras';
+
 function RiskSection({ data }: { data: Risks }) {
   const labels: Record<string, string> = { bushfire: 'Bushfire', flood: 'Flood', historical_flood: 'Historical flood', heritage: 'Heritage', landslide: 'Landslide', erosion: 'Erosion', environment: 'Environment', hv_power_line: 'High-voltage power lines', mobile_black_spot: 'Mobile black spots' };
   return <div className="risk-list">{Object.entries(labels).map(([key, label]) => <section key={key}><h4>{label}</h4>{!data[key] ? <p>{absent}</p> : !data[key]!.length ? <p>No matching records returned within the search radius (1 km).</p> : data[key]!.map((record, index) => {
@@ -32,7 +22,7 @@ function RiskSection({ data }: { data: Risks }) {
   })}</section>)}<section><h4>Neighbourhood context: public housing</h4>{!data.public_housing ? <p>{absent}</p> : !data.public_housing.length ? <p>No matching records returned within 1 km.</p> : data.public_housing.map((r, i) => <p key={i}>{r.on_property === true ? 'Containing Census area' : r.on_property === false ? 'Nearby Census area' : 'Census area (location relation unknown)'}: {value(r.value)}{r.value_unit ? ` (${r.value_unit})` : ''}{r.nearest_distance_m == null ? '' : `; ${r.nearest_distance_m} m away`}</p>)}</section><p className="fine-print">Overlays are tested at the address point, not the surveyed parcel boundary. They do not replace a planning certificate.</p></div>;
 }
 function PropertySections({ sections, retry }: { sections: Sections; retry: () => void }) {
-  return <>{(['basics', 'valuation', 'risks'] as const).map(key => {
+  return <>{(['basics', 'valuation'] as const).map(key => {
     const section = sections[key];
     let content;
     if (section?.status === 'error') content = <Retry error={section.error} retry={retry} />;
@@ -43,7 +33,7 @@ function PropertySections({ sections, retry }: { sections: Sections; retry: () =
     } else if (key === 'valuation' && sections.valuation?.status === 'ok') {
       const d = sections.valuation.data;
       content = <><Rows entries={[["Model estimate (AUD)", money(d.predicted_price)], ['80% prediction interval (AUD)', `${money(d.predicted_price_low)} – ${money(d.predicted_price_high)}`], ['Prediction date', value(d.prediction_date)], ['Model confidence', d.confidence_score == null ? absent : `${d.confidence_score}/100`]]} /><p className="fine-print">A model estimate, not a sale price or a formal appraisal.</p></>;
-    } else if (key === 'risks' && sections.risks?.status === 'ok') content = <RiskSection data={sections.risks.data} />;
+    }
     return <section key={key} className="property-section"><h3>{{ basics: 'Property facts', valuation: 'Automated valuation', risks: 'Overlays and nearby features' }[key]}</h3>{content}</section>;
   })}</>;
 }
@@ -66,7 +56,10 @@ export function attachPropertyLookup({ host, shadow, selection, isCurrent, repos
         {state.phase === 'choices' && <><h2>Choose the matching address</h2><p className="fine-print">Check the unit number and suburb before continuing.</p><ul className="address-choices">{state.candidates.map(c => <li key={c.id}><Button variant="outline" onClick={() => void details(c)}><MapPinIcon data-icon="inline-start" aria-hidden="true" />{c.label}</Button></li>)}</ul></>}
         {state.phase === 'empty' && <Empty><EmptyHeader><EmptyTitle>No matching addresses</EmptyTitle><EmptyDescription>Select a fuller address, including the suburb. Coverage is limited to the City of Sydney LGA.</EmptyDescription></EmptyHeader></Empty>}
         {state.phase === 'error' && <Retry error={state.error} retry={() => void (state.candidate ? details(state.candidate) : search())} />}
-        {state.phase === 'details' && state.sections && <><PropertySections sections={state.sections} retry={() => void details(state.candidate!)} /><p className="fine-print">Source: Microburbs Hackathon API. Coverage: City of Sydney LGA.</p></>}
+        {state.phase === 'details' && state.sections && <><PropertySections sections={state.sections} retry={() => void details(state.candidate!)} />
+          <PropertyExtras key={`${revision}:${state.candidate!.id}`} id={state.candidate!.id} reposition={reposition}
+            risks={state.sections.risks?.status === 'error' ? <Retry error={state.sections.risks.error} retry={() => void details(state.candidate!)} />
+              : state.sections.risks?.status === 'ok' ? <RiskSection data={state.sections.risks.data} /> : <p>{absent}</p>} /><p className="fine-print">Source: Microburbs Hackathon API. Coverage: City of Sydney LGA.</p></>}
         {state.candidate && state.candidates.length > 1 && state.phase !== 'loading' && <Button variant="outline" onClick={choices}><ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />Choose another match</Button>}
       </section>}
     </>));

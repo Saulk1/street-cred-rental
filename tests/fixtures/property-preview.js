@@ -1,12 +1,27 @@
 "use strict";
 
 // Main-world UI preview only. The real extension uses its isolated-world worker.
+// Invented observations with field shapes from the bundled hackathon YAML.
+const sectionFixtures = fetch('property-sections.json').then(response => response.json());
 chrome.runtime = { async sendMessage(message) {
   const scenario = document.getElementById("scenario").value;
   if (message.type === "SEARCH_ADDRESS") return { ok: true, candidates: scenario === "empty" ? [] : [
     { id: "GANSW705970502", label: "26 Tudor Street, Surry Hills (mock)" },
     ...(scenario === "multiple" ? [{ id: "GANSWDEMO2", label: "Unit 2/26 Tudor Street, Surry Hills (mock)" }] : []),
   ] };
+  if (message.type === "PROPERTY_SECTION") {
+    const fixture = await sectionFixtures;
+    if (scenario === "no-extra") return message.section === "market"
+      ? { ok: true, market: { sale: { status: "empty" }, rent: { status: "empty" } } }
+      : { ok: true, section: { status: "empty" } };
+    if (message.section === "market") return { ok: true, market: {
+      ...(message.part === "rent" ? {} : { sale: { status: "ok", data: fixture.sale } }),
+      ...(message.part === "sale" ? {} : { rent: scenario === "partial" && !message.part
+        ? { status: "error", error: { message: "Mock rental observation unavailable. Retry loads only rent." } }
+        : { status: "ok", data: fixture.rent } }),
+    } };
+    return { ok: true, section: { status: "ok", data: fixture[message.section] } };
+  }
   return { ok: true, sections: {
     basics: { status: "ok", data: { dwelling_type: "house", bed_count: 3, bath_count: 2, parking_count: 0, land_area_sqm: 120 } },
     valuation: scenario === "partial" ? { status: "error", error: { message: "Mock valuation is unavailable. Retry to request it again." } }

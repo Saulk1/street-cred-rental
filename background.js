@@ -13,20 +13,28 @@ async function saveNote(text, type) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (![NOTEPAD.MESSAGES.SAVE_SELECTION_NOTE, NOTEPAD.MESSAGES.SEARCH_ADDRESS,
-    NOTEPAD.MESSAGES.PROPERTY_DETAILS].includes(message?.type)) return;
+    NOTEPAD.MESSAGES.PROPERTY_DETAILS, NOTEPAD.MESSAGES.PROPERTY_SECTION].includes(message?.type)) return;
   if (sender.id !== chrome.runtime.id || sender.frameId !== 0
     || !Number.isInteger(sender.tab?.id) || !/^https?:\/\//.test(sender.url ?? "")) {
     sendResponse({ ok: false });
     return;
   }
-  if (message.type === NOTEPAD.MESSAGES.SEARCH_ADDRESS || message.type === NOTEPAD.MESSAGES.PROPERTY_DETAILS) {
+  if (message.type === NOTEPAD.MESSAGES.SEARCH_ADDRESS || message.type === NOTEPAD.MESSAGES.PROPERTY_DETAILS
+    || message.type === NOTEPAD.MESSAGES.PROPERTY_SECTION) {
     const search = message.type === NOTEPAD.MESSAGES.SEARCH_ADDRESS;
     const value = search ? message.address : message.id;
     if (typeof value !== "string" || (search ? value.trim().length < 2 || value.length > 1000 : !/^[A-Za-z0-9_-]{1,80}$/.test(value))) {
       sendResponse({ ok: false, error: { code: "validation", message: "Select one address with at least two characters (maximum 1000)." } });
       return;
     }
-    const operation = search ? PROPERTY_API.search(value.trim().replace(/\s+/g, " ")) : PROPERTY_API.details(value);
+    const extraSection = message.type === NOTEPAD.MESSAGES.PROPERTY_SECTION;
+    if (extraSection && (!NOTEPAD.PROPERTY_SECTIONS.includes(message.section)
+      || (message.part !== undefined && (message.section !== "market" || !["sale", "rent"].includes(message.part))))) {
+      sendResponse({ ok: false, error: { code: "validation", message: "Choose a supported property section." } });
+      return;
+    }
+    const operation = search ? PROPERTY_API.search(value.trim().replace(/\s+/g, " "))
+      : extraSection ? PROPERTY_API.extra(value, message.section, message.part) : PROPERTY_API.details(value);
     operation.then(sendResponse, () => sendResponse({ ok: false, error: { code: "server", message: "Could not look up this property. Please retry." } }));
     return true;
   }

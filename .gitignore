@@ -3,9 +3,9 @@
 /.codex/
 /.loci/
 /node_modules/
-/dist/
 /.build/
 __pycache__/
 .DS_Store
 .env
 .env.*
+/.vercel/

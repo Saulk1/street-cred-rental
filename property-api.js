@@ -94,6 +94,61 @@ const PROPERTY_API = (() => {
       nearest_distance_m: number(row.nearest_distance_m), search_radius_m: number(row.search_radius_m),
     })) : null]));
   }
+  function history(data) {
+    if (!object(data)) throw invalid();
+    return { date: text(data.date), price: number(data.price), type: text(data.type), address: text(data.address) };
+  }
+  function planning(data) {
+    if (!object(data)) throw invalid();
+    const zone = data.zoning_code;
+    return {
+      zoning_code: object(zone) ? { code: text(zone.code), name: text(zone.name), category: text(zone.category) } : null,
+      zoning_overlays: Array.isArray(data.zoning_overlays) ? data.zoning_overlays.filter(object).map(row => ({
+        layer: text(row.layer), value: text(row.value),
+      })) : null,
+    };
+  }
+  function schools(data) {
+    if (!Array.isArray(data)) throw invalid();
+    return data.filter(object).map(row => ({ id: number(row.id), name: text(row.name), sector: text(row.sector),
+      school_level_type: text(row.school_level_type), distance_m: number(row.distance_m) }))
+      .sort((a, b) => (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity));
+  }
+  function counts(data) {
+    if (!object(data)) return {};
+    return Object.fromEntries(Object.entries(data).map(([key, count]) => [key, number(count)]));
+  }
+  function amenities(data) {
+    if (!object(data) || !Array.isArray(data.results)) throw invalid();
+    return { radius_m: number(data.radius_m), counts: counts(data.counts), results: data.results.filter(object).map(row => ({
+      name: text(row.name), category: text(row.category), distance_m: number(row.distance_m),
+    })).sort((a, b) => (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity)) };
+  }
+  function transport(data) {
+    if (!object(data) || !object(data.nearest)) throw invalid();
+    return { radius_m: number(data.radius_m), counts: counts(data.counts), nearest: Object.fromEntries(
+      ["train", "tram", "bus", "ferry"].map(mode => {
+        const row = data.nearest[mode];
+        return [mode, object(row) ? { name: text(row.name), label: text(row.label), distance_m: number(row.distance_m) } : null];
+      })) };
+  }
+  async function extra(id, key, part) {
+    if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(id)
+      || !["market", "planning", "schools", "amenities", "transport"].includes(key)
+      || (part !== undefined && (key !== "market" || !["sale", "rent"].includes(part)))) {
+      return { ok: false, error: { code: "validation", message: "Choose a supported property section." } };
+    }
+    const prefix = `/v1/properties/${encodeURIComponent(id)}`;
+    if (key === "market") {
+      const parts = part ? [part] : ["sale", "rent"];
+      const values = await Promise.all(parts.map(name => section(prefix + `/${name}-history-latest`, history)));
+      return { ok: true, market: Object.fromEntries(parts.map((name, index) => [name, values[index]])) };
+    }
+    const endpoints = { planning: ["/development/all", planning], schools: ["/schools/nearby", schools],
+      amenities: ["/amenities/nearby?radius_m=1000", amenities], transport: ["/transport/nearby?radius_m=1000", transport] };
+    const [path, normalise] = endpoints[key];
+    return { ok: true, section: await section(prefix + path, normalise) };
+  }
   async function section(path, normalise) {
     try {
       const data = await request(path);
@@ -118,5 +173,5 @@ const PROPERTY_API = (() => {
       section(prefix + "/valuation/avm", valuation), section(prefix + "/risks/all", risks)]);
     return { ok: true, sections: { basics: values[0], valuation: values[1], risks: values[2] } };
   }
-  return Object.freeze({ search, details });
+  return Object.freeze({ search, details, extra });
 })();

@@ -37,6 +37,22 @@ Released under the [MIT License](LICENSE). Copyright © 2026 Street Cred contrib
 
 ## Install locally
 
+### Optional Neon data API
+
+The repository includes a separate Vercel/Drizzle backend. The 9,143 records from
+`assets/example.csv` are imported into Neon's `energy_reports` table with a typed
+Drizzle schema. `GET /api/health` checks Neon connectivity. See
+[Data API setup](docs/data-api.md) for database roles, environment configuration,
+local development, deployment, migrations and import verification. Dataset query
+endpoints and extension data views are deferred.
+
+Set the optional `DATA_API_BASE_URL` in `.env.local` to prepare an extension build
+for the deployed API. Database credentials belong only in the server environment;
+the extension receives the public API origin. Existing Microburbs lookups work
+independently.
+
+### Extension installation
+
 1. Create `.env.local` if it does not exist. Set `MICROBURBS_API_BASE_URL=https://api.microburbs.com.au` and `MICROBURBS_API_KEY` to your team's key. Keep existing local credentials when updating an installation.
 2. With Node.js 22.12+ installed, run `npm ci`, then `python3 scripts/package.py` to generate the local runtime configuration, `dist/unpacked/` and the ZIP. An empty key is supported for development: notes work, and property lookups show setup guidance.
 3. Open `chrome://extensions` in desktop Chrome and turn on **Developer mode**.
@@ -149,6 +165,28 @@ Nearby overlays are distinguished from overlays at the address point. Power
 lines and mobile black spots are proximity information; public-housing records
 appear as neighbourhood context. These are model and overlay outputs, not a
 formal appraisal or planning certificate.
+
+Below the overview, expand any of five sections to load additional data:
+
+- **Latest market activity:** the latest sale/listing and rental observations,
+  with event type, month, price and address. A listing is not necessarily a
+  completed sale, and rent has no assumed weekly or monthly period.
+- **Zoning and planning:** published zone code, name, category and individual
+  overlays, preserving their returned values and units.
+- **Nearby schools:** school name, level, sector and straight-line distance,
+  without implying catchment eligibility.
+- **Nearby amenities:** supermarkets, green spaces and restaurants/cafés within
+  1 km, separating API totals from the capped returned lists.
+- **Nearby transport:** stop counts and the nearest train, tram, bus and ferry
+  stop within 1 km, with straight-line distances rather than walking routes.
+
+Several sections can stay open together. Each loads on first expansion and
+keeps its result only for the current card and address match. Schools and amenity
+categories initially show five returned rows; **Show more** reveals the rest
+without another request. Errors have section-specific retries; sale and rental
+observations retry independently. Existing overlays are also collapsible and
+remain part of the initial request. Browser Find can reopen a loaded, collapsed
+section containing a match.
 
 Lookup is explicit and does not save a note. **Save to notes** remains independent.
 Scrolling inside the card works normally; page scrolling, resizing and Escape
@@ -371,6 +409,25 @@ This is an installable extension shell, not a feature-complete product. Its curr
 functionality may be rejected under Chrome Web Store's minimum functionality requirements.
 Add useful functionality before seeking public approval. Nothing has been submitted
 or published. See `store/listing.md` for accurate draft copy and preparation steps.
+
+## Expanded property card verification
+
+On 2026-11-07, the rebuilt unpacked extension was reloaded in native Chrome.
+Selecting **26 Tudor Street, Surry Hills**, choosing the Sydney match and opening
+all five new sections loaded live market, planning, school, amenity and transport
+data. Amenity totals and returned-list lengths differed in the live response and
+were displayed separately. At 200% page zoom, market and transport results
+wrapped within the card and scrolled internally while the full selected address
+remained visible. Browser zoom was restored, and no notes were added or deleted.
+
+The separate mock preview verified keyboard expansion and native browser Find:
+searching for text in a previously loaded, collapsed planning section reopened
+it and synchronized the trigger state. Automated tests cover lazy loading,
+reopening without refetching, additional rows, missing and zero values,
+independent market retries, rate-limit timing, stale replies and validated
+worker routes. Package checks validate local assets and development-file
+exclusions. Full screen-reader testing and a complete console/CSP inspection
+remain manual checks.
 
 ## Shadcn makeover verification
 

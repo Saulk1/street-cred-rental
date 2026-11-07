@@ -1,0 +1,23 @@
+{
+  "sale": { "date": "2025-05-22", "price": 990000, "type": "For Sale", "address": "26 Tudor Street, Surry Hills" },
+  "rent": { "date": "2025-07-24", "price": 3000, "type": "For Rent", "address": "26 Tudor Street, Surry Hills" },
+  "planning": { "zoning_code": { "code": "R2", "name": "Low Density Residential", "category": "Residential Zones" }, "zoning_overlays": [{ "layer": "hob", "value": "10 m" }, { "layer": "hob", "value": "5.5 m" }, { "layer": "fsr", "value": "1.5" }, { "layer": "custom", "value": "Original unit" }] },
+  "schools": [
+    { "id": 42002, "name": "Example Primary School", "school_level_type": "Primary", "sector": "public", "distance_m": 612 },
+    { "id": 42003, "name": "Example Secondary School", "school_level_type": "Secondary", "sector": "private", "distance_m": 720 },
+    { "id": 42004, "name": "Example Combined School", "school_level_type": "Combined", "sector": "public", "distance_m": 850 },
+    { "id": 42005, "name": "Example School Four", "school_level_type": "Primary", "sector": "public", "distance_m": 900 },
+    { "id": 42006, "name": "Example School Five", "school_level_type": "Secondary", "sector": "public", "distance_m": 1000 },
+    { "id": 42007, "name": "Example School Six", "school_level_type": "Primary", "sector": "public", "distance_m": 1200 }
+  ],
+  "amenities": { "gnaf_id": "GANSW1", "center_lat": -33.88, "center_lng": 151.21, "radius_m": 1000, "counts": { "green_spaces": 0, "restaurant": 11, "supermarket": 8 }, "results": [
+    { "category": "Supermarket", "distance_m": 100, "name": "Example Market One" },
+    { "category": "Supermarket", "distance_m": 200, "name": "Example Market Two" },
+    { "category": "Supermarket", "distance_m": 300, "name": "Example Market Three" },
+    { "category": "Supermarket", "distance_m": 400, "name": "Example Market Four" },
+    { "category": "Supermarket", "distance_m": 500, "name": "Example Market Five" },
+    { "category": "Supermarket", "distance_m": 600, "name": "Example Market Six" },
+    { "category": "Restaurant", "distance_m": 190, "name": null }
+  ] },
+  "transport": { "gnaf_id": "GANSW1", "center_lat": -33.88, "center_lng": 151.21, "radius_m": 1000, "counts": { "bus": 6, "ferry": 0, "train": 1, "tram": 0 }, "nearest": { "bus": { "distance_m": 130, "label": "Bus stop", "name": null }, "train": { "distance_m": 600, "label": "Train station", "name": "Example Station" }, "ferry": null, "tram": null } }
+}

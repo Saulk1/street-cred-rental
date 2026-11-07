@@ -1,0 +1,17 @@
+# Upload only the API, its dependencies and build configuration.
+*
+!api/
+!api/**
+!server/
+!server/**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.server.json
+!vercel.json
+!vitest.server.config.mts
+!drizzle.config.ts
+# Local secrets and future raw datasets are never deployment inputs.
+.env*
+**/*.csv
+**/*.tsv

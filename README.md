@@ -59,9 +59,12 @@ independently.
 4. Click **Load unpacked** and choose **`dist/unpacked/`**, which contains the generated manifest.
 5. Pin **Microburbs Facts** from Chrome's Extensions menu and click its icon.
 
-This is a local team build. `.env.local` and generated files in `dist/` stay out
-of Git, but the generated extension contains an inspectable copy of the key.
-Do not distribute a package containing a private team key publicly.
+The committed `dist/unpacked/` folder and extension ZIP contain no private API
+key and can be loaded without building; property lookup shows setup guidance
+until rebuilt locally with a key. `.env.local` stays out of Git. Local packaging
+embeds an inspectable copy of its configured key in the generated extension.
+Do not commit or publicly distribute a locally rebuilt package containing a
+private team key.
 The root `runtime-config.js` is an empty source placeholder, never a place for keys.
 The Python builder reads dotenv assignments without running shell code or expanding variables.
 
@@ -85,7 +88,8 @@ server is needed for normal use.
 
 If lookup still shows setup guidance after rebuilding, open the extension's
 **Details** in `chrome://extensions` and check **Loaded from**. It must point to
-`dist/unpacked/`; loading the repository root uses the empty source configuration.
+`dist/unpacked/`; the repository root lacks the generated UI files and cannot
+be loaded directly as an extension.
 Disable the root installation before loading the generated folder to avoid
 duplicate controls. Its saved notes remain in the disabled installation.
 

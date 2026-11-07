@@ -1,19 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapPinIcon, RefreshCwIcon, DownloadIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Table, TableCaption, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { CodeBlock, CodeBlockContent } from '@/components/ui/code-block';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Rows, Retry } from '@/components/property-feedback';
-import { PropertySections, RiskSection } from '@/property-lookup';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ChevronDownIcon, MapPinIcon, RefreshCwIcon, DownloadIcon } from 'lucide-react';
 import { PropertyOverview } from '@/property-overview';
-import type { Candidate, LookupError, Basics, Valuation, Risks } from '@/types';
+import type { Candidate, LookupError } from '@/types';
 
 export type ReportTask = {
   id: string; endpoint: string; title: string; group: string;
@@ -34,47 +22,42 @@ async function send(message: object): Promise<Reply> {
   catch { return { ok: false }; }
 }
 
-function PageButtons({ page, count, change, unit = 'rows' }: { page: number; count: number; change: (page: number) => void; unit?: string }) {
-  return <div className="report-actions">
-    <Button variant="outline" size="sm" disabled={page === 0} onClick={() => change(page - 1)}>Previous</Button>
-    <span className="text-muted-foreground">Page {page + 1} of {Math.max(1, count)} ({unit})</span>
-    <Button variant="outline" size="sm" disabled={page + 1 >= count} onClick={() => change(page + 1)}>Next</Button>
-  </div>;
+function Disclosure({ title, children }: { title: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return <details className="report-disclosure" onToggle={event => setOpen(event.currentTarget.open)}><summary>{title}<ChevronDownIcon aria-hidden="true" /></summary>{open && <div className="report-stack report-disclosure-content">{children}</div>}</details>;
 }
-
-// Only the visible page of each array is mounted. Geometry remains available in
-// the full response/download rather than expanding thousands of coordinates.
+function Retry({ error, retry }: { error?: LookupError; retry: () => void }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const delay = Math.max(0, (error?.retryAt ?? 0) - Date.now());
+    if (!delay) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(delay, 2147483647));
+    return () => clearTimeout(timer);
+  }, [error?.retryAt, now]);
+  const waiting = (error?.retryAt ?? 0) > now;
+  return <div className="popup-alert"><p>{error?.message ?? 'Could not read this property data. Please retry.'}</p>{error?.requestId && <p>Request ID: {error.requestId}</p>}{waiting && <p>Retry available after {new Date(error!.retryAt!).toLocaleTimeString()}.</p>}<button className="popup-button" disabled={waiting} onClick={retry}>Retry</button></div>;
+}
+function PageButtons({ page, count, change, unit = 'rows' }: { page: number; count: number; change: (page: number) => void; unit?: string }) {
+  return <div className="report-actions"><button className="popup-button compact" disabled={page === 0} onClick={() => change(page - 1)}>Previous</button><span className="overview-muted">Page {page + 1} of {Math.max(1, count)} ({unit})</span><button className="popup-button compact" disabled={page + 1 >= count} onClick={() => change(page + 1)}>Next</button></div>;
+}
 function DataView({ data, depth = 0 }: { data: unknown; depth?: number }) {
   const [page, setPage] = useState(0);
-  if (depth > 4) return <p className="text-muted-foreground">Nested detail is available in Full response or Download JSON.</p>;
+  if (depth > 4) return <p className="overview-muted">Nested detail is available in Full response or Download JSON.</p>;
   if (Array.isArray(data)) {
     if (!data.length) return <p>No records returned.</p>;
-    return <div className="report-stack"><Table><TableCaption>{data.length.toLocaleString('en-AU')} returned records; showing {page * 10 + 1}–{Math.min(data.length, page * 10 + 10)}.</TableCaption><TableBody>
-      {data.slice(page * 10, page * 10 + 10).map((row, index) => <TableRow key={page * 10 + index}><TableCell className="whitespace-normal"><DataView data={row} depth={depth + 1} /></TableCell></TableRow>)}
-    </TableBody></Table>{data.length > 10 && <PageButtons page={page} count={Math.ceil(data.length / 10)} change={setPage} />}</div>;
+    return <div className="report-stack"><p className="overview-caption">{data.length.toLocaleString('en-AU')} returned records; showing {page * 10 + 1}–{Math.min(data.length, page * 10 + 10)}.</p><ol className="report-records" start={page * 10 + 1}>{data.slice(page * 10, page * 10 + 10).map((row, index) => <li key={page * 10 + index}><DataView data={row} depth={depth + 1} /></li>)}</ol>{data.length > 10 && <PageButtons page={page} count={Math.ceil(data.length / 10)} change={setPage} />}</div>;
   }
   if (data === null || typeof data !== 'object') return <p>{scalar(data)}</p>;
   const entries = Object.entries(data as Record<string, unknown>);
   const simple = entries.filter(([, value]) => value === null || typeof value !== 'object');
   const nested = entries.filter(([, value]) => value !== null && typeof value === 'object');
-  return <div className="report-stack">
-    {simple.length > 0 && <Rows entries={simple.map(([key, value]) => [label(key), scalar(value)])} />}
-    {nested.map(([key, value]) => <Collapsible key={key}>
-      <CollapsibleTrigger asChild><Button variant="outline" size="sm">{label(key)}{Array.isArray(value) ? ` (${value.length})` : ''}</Button></CollapsibleTrigger>
-      <CollapsibleContent className="pt-3"><DataView data={value} depth={depth + 1} /></CollapsibleContent>
-    </Collapsible>)}
-    {!entries.length && <p>No fields returned.</p>}
-  </div>;
+  return <div className="report-stack">{simple.length > 0 && <dl className="report-facts">{simple.map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{scalar(value)}</dd></div>)}</dl>}{nested.map(([key, value]) => <Disclosure key={key} title={label(key) + (Array.isArray(value) ? ` (${value.length})` : '')}><DataView data={value} depth={depth + 1} /></Disclosure>)}{!entries.length && <p>No fields returned.</p>}</div>;
 }
-
 function FullResponse({ envelope }: { envelope: Envelope }) {
   const text = useMemo(() => JSON.stringify(envelope, null, 2), [envelope]);
   const [page, setPage] = useState(0);
-  return <div className="report-stack"><CodeBlock size="sm"><CodeBlockContent wrap className="max-h-64" aria-label="Full API response">{text.slice(page * 10000, (page + 1) * 10000)}</CodeBlockContent></CodeBlock>
-    {text.length > 10000 && <><p>Large response displayed in 10,000-character pages. Download JSON preserves the entire response.</p><PageButtons page={page} count={Math.ceil(text.length / 10000)} change={setPage} unit="JSON chunks" /></>}
-  </div>;
+  return <div className="report-stack"><pre className="report-json" aria-label="Full API response" tabIndex={0}><code>{text.slice(page * 10000, (page + 1) * 10000)}</code></pre>{text.length > 10000 && <><p>Large response displayed in 10,000-character pages. Download JSON preserves the entire response.</p><PageButtons page={page} count={Math.ceil(text.length / 10000)} change={setPage} unit="JSON chunks" /></>}</div>;
 }
-
 function Download({ envelope, name }: { envelope: Envelope; name: string }) {
   const [error, setError] = useState('');
   function download(value: unknown, extension: string) {
@@ -88,11 +71,8 @@ function Download({ envelope, name }: { envelope: Envelope; name: string }) {
   }
   const data = envelope.data as Record<string, unknown> | null;
   const geometry = envelope.geojson ?? data?.geojson ?? (data?.type === 'FeatureCollection' || data?.type === 'Feature' ? data : undefined);
-  return <div className="report-actions"><Button size="sm" variant="outline" onClick={() => download(envelope, 'json')}><DownloadIcon data-icon="inline-start" aria-hidden="true" />Download JSON</Button>
-    {geometry != null && <Button size="sm" variant="outline" onClick={() => download(geometry, 'geojson')}>Download GeoJSON</Button>}
-    {error && <p role="alert">{error}</p>}</div>;
+  return <div className="report-actions"><button className="popup-button compact" onClick={() => download(envelope, 'json')}><DownloadIcon aria-hidden="true" />Download JSON</button>{geometry != null && <button className="popup-button compact" onClick={() => download(geometry, 'geojson')}>Download GeoJSON</button>}{error && <p role="alert">{error}</p>}</div>;
 }
-
 function EndpointResult({ report, task, reload }: { report: ReportSnapshot; task: ReportTask; reload: () => void }) {
   const [result, setResult] = useState<Envelope | null>();
   const [error, setError] = useState(false);
@@ -118,29 +98,13 @@ function EndpointResult({ report, task, reload }: { report: ReportSnapshot; task
   if (task.status === 'error') return <Retry error={task.error} retry={() => void retry()} />;
   if (task.status === 'pending' || task.status === 'loading') return <p>Queued. This endpoint loads automatically.</p>;
   if (error) return <Retry error={{ message: 'Could not read the saved response.' }} retry={() => setRevision(v => v + 1)} />;
-  if (!result) return <Skeleton className="h-16 w-full" aria-label="Loading saved result" />;
-  return <div className="report-stack">
-    {task.savedAt && <p className="text-muted-foreground">Response saved {new Date(task.savedAt).toLocaleString('en-AU')}.</p>}
-    {(task.status === 'unavailable' || task.status === 'empty') && <><p>{scalar(result.message ?? result.reason ?? 'No data returned for this address.')}</p><Button variant="outline" size="sm" onClick={() => void retry()}>Retry endpoint</Button></>}
-    {task.notice && <Alert><AlertDescription>{task.notice}</AlertDescription></Alert>}
-    {documentation && <Collapsible><CollapsibleTrigger asChild><Button variant="ghost" size="sm">API coverage and limits</Button></CollapsibleTrigger><CollapsibleContent><p className="whitespace-pre-wrap">{documentation}</p></CollapsibleContent></Collapsible>}
-    {task.status === 'ok' && result.data && typeof result.data === 'object' && !Array.isArray(result.data) && task.endpoint.endsWith('/basics/all')
-      ? <PropertySections keys={['basics']} sections={{ basics: { status: 'ok', data: result.data as Basics } }} retry={() => void retry()} />
-      : task.status === 'ok' && result.data && typeof result.data === 'object' && !Array.isArray(result.data) && task.endpoint.endsWith('/valuation/avm')
-      ? <PropertySections keys={['valuation']} sections={{ valuation: { status: 'ok', data: result.data as Valuation } }} retry={() => void retry()} />
-      : task.endpoint.startsWith('/v1/properties/') && task.endpoint.endsWith('/risks/all') && result.data && typeof result.data === 'object' && Object.values(result.data).every(value => value === null || Array.isArray(value))
-      ? <RiskSection data={result.data as Risks} /> : <DataView data={result.data} />}
-    <Collapsible><CollapsibleTrigger asChild><Button variant="outline" size="sm">Full response</Button></CollapsibleTrigger><CollapsibleContent className="pt-3"><FullResponse envelope={result} /></CollapsibleContent></Collapsible>
-    <Download envelope={result} name={`${report.candidate.id}-${task.endpoint.split('/').slice(4).join('-') || 'profile'}`} />
-  </div>;
+  if (!result) return <p className="overview-muted" aria-busy="true">Loading saved result…</p>;
+  return <div className="report-stack">{task.savedAt && <p className="overview-caption">Response saved {new Date(task.savedAt).toLocaleString('en-AU')}.</p>}{(task.status === 'unavailable' || task.status === 'empty') && <><p>{scalar(result.message ?? result.reason ?? 'No data returned for this address.')}</p><button className="popup-button compact" onClick={() => void retry()}>Retry endpoint</button></>}{task.notice && <p className="popup-alert">{task.notice}</p>}{documentation && <Disclosure title="API coverage and limits"><p className="report-documentation">{documentation}</p></Disclosure>}<DataView data={result.data} /><Disclosure title="Full response"><FullResponse envelope={result} /></Disclosure><Download envelope={result} name={`${report.candidate.id}-${task.endpoint.split('/').slice(4).join('-') || 'profile'}`} /></div>;
 }
-
 function ReportGroup({ tasks, report, reload }: { tasks: ReportTask[]; report: ReportSnapshot; reload: () => void }) {
   const [page, setPage] = useState(0);
   const visible = tasks.slice(page * 20, page * 20 + 20);
-  return <div className="report-stack"><Accordion type="multiple">{visible.map(task => <AccordionItem key={task.id} value={task.id}><AccordionTrigger><span>{task.title}<span className="block text-xs text-muted-foreground">{task.endpoint.includes('area-stats') ? task.id : task.id.includes('?layer=') || task.id.includes('&layer=') ? task.id.split('?')[1] : ''}</span></span><Badge variant={task.status === 'error' ? 'destructive' : 'outline'}>{task.status}</Badge></AccordionTrigger><AccordionContent><EndpointResult report={report} task={task} reload={reload} /></AccordionContent></AccordionItem>)}</Accordion>
-    {tasks.length > 20 && <PageButtons page={page} count={Math.ceil(tasks.length / 20)} change={setPage} unit="endpoints" />}
-  </div>;
+  return <div className="report-stack">{visible.map(task => <Disclosure key={task.id} title={<><span>{task.title}<span className="report-task-caption">{task.endpoint.includes('area-stats') ? task.id : task.id.includes('?layer=') || task.id.includes('&layer=') ? task.id.split('?')[1] : ''}</span></span><span className="popup-badge" data-tone={task.status === 'error' ? 'warning' : 'neutral'}>{task.status}</span></>}><EndpointResult report={report} task={task} reload={reload} /></Disclosure>)}{tasks.length > 20 && <PageButtons page={page} count={Math.ceil(tasks.length / 20)} change={setPage} unit="endpoints" />}</div>;
 }
 
 export function PropertyReport({ onSave }: { onSave?: (candidate: Candidate) => Promise<void> } = {}) {
@@ -193,25 +157,19 @@ export function PropertyReport({ onSave }: { onSave?: (candidate: Candidate) => 
     return [...result];
   }, [report]);
   return <div className="report-stack">
-    {error && <Alert variant="destructive"><AlertTitle>Report unavailable</AlertTitle><AlertDescription>{error}<Button variant="outline" size="sm" onClick={() => refresh.current()}>Try again</Button></AlertDescription></Alert>}
-    {report === undefined && !error && <Skeleton className="h-24 w-full" aria-label="Loading property report" />}
-    {report === null && <Empty><EmptyHeader><EmptyMedia variant="icon"><MapPinIcon aria-hidden="true" /></EmptyMedia><EmptyTitle><h1>No confirmed address yet</h1></EmptyTitle><EmptyDescription>Select an address on a webpage, choose Look up property, and confirm the match. Its full report will appear here.</EmptyDescription></EmptyHeader></Empty>}
+    {error && <div className="popup-alert" role="alert"><h2>Report unavailable</h2><p>{error}</p><button className="popup-button compact" onClick={() => refresh.current()}>Try again</button></div>}
+    {report === undefined && !error && <p className="popup-loading" aria-busy="true">Loading property report…</p>}
+    {report === null && <div className="popup-empty"><MapPinIcon aria-hidden="true" /><h1>No confirmed address yet</h1><p>Select an address on a webpage, choose Look up property, and confirm the match. Its full report will appear here.</p></div>}
     {report && <>
       <PropertyOverview key={report.id} report={report} onSave={onSave} />
-      <Collapsible className="report-stack"><CollapsibleTrigger asChild><Button variant="outline" className="w-full">Sources & full property report</Button></CollapsibleTrigger><CollapsibleContent className="report-stack pt-3">
-      <Card><CardHeader><CardTitle><h2>Report coverage</h2></CardTitle><CardDescription>GNAF: {report.candidate.id}</CardDescription></CardHeader><CardContent className="flex flex-col gap-3">
-        <p>{report.completed} of {report.total} requests processed · {report.state}{report.errors ? ` · ${report.errors} failed` : ''}</p>
-        <p className="text-muted-foreground">Updated {new Date(report.updatedAt).toLocaleString('en-AU')}. More datasets may appear as the report loads.</p>
-        <Button variant="outline" onClick={() => void restart()}><RefreshCwIcon data-icon="inline-start" aria-hidden="true" />Refresh report</Button>
-      </CardContent></Card>
-      {report.error && <Alert variant="destructive"><AlertDescription>{report.error}</AlertDescription></Alert>}
-      <Accordion type="multiple">{groups.map(([group, tasks]) => <AccordionItem key={group} value={group}><AccordionTrigger>{label(group)} ({tasks.length})</AccordionTrigger><AccordionContent>
-        <ReportGroup key={report.id + group} tasks={tasks} report={report} reload={() => refresh.current()} />
-      </AccordionContent></AccordionItem>)}</Accordion>
-      <Collapsible><CollapsibleTrigger asChild><Button size="sm" variant="ghost">Supporting endpoints and coverage</Button></CollapsibleTrigger><CollapsibleContent><ul className="flex flex-col gap-2">{report.supporting.map(item => <li key={item.endpoint}>{item.endpoint}: {item.reason}</li>)}</ul></CollapsibleContent></Collapsible>
-      <p className="text-muted-foreground">Source: Microburbs Hackathon API. Returned data may be unavailable or capped by the API. Valuations are estimates; overlays do not replace a planning certificate. Responses stay in this Chrome profile.</p>
-      </CollapsibleContent></Collapsible>
-      <p className="overview-caption">{report.state === 'running' ? `Loading property data · ${report.completed} of ${report.total} requests processed` : report.state === 'paused' ? 'Report paused. Open the full report for details.' : report.errors ? `Report ready · ${report.errors} requests need attention` : 'Property data saved in this Chrome profile.'}</p>
+      <Disclosure title="Sources & full property report">
+        <article className="overview-card"><header><h2>Report coverage</h2><p className="overview-caption">GNAF: {report.candidate.id}</p></header><p>{report.completed} of {report.total} requests processed · {report.state}{report.errors ? ` · ${report.errors} failed` : ''}</p><p className="overview-muted">Updated {new Date(report.updatedAt).toLocaleString('en-AU')}. More datasets may appear as the report loads.</p><button className="popup-button" onClick={() => void restart()}><RefreshCwIcon aria-hidden="true" />Refresh report</button></article>
+        {report.error && <p className="popup-alert" role="alert">{report.error}</p>}
+        {groups.map(([group, tasks]) => <Disclosure key={group} title={`${label(group)} (${tasks.length})`}><ReportGroup key={report.id + group} tasks={tasks} report={report} reload={() => refresh.current()} /></Disclosure>)}
+        <Disclosure title="Supporting endpoints and coverage"><ul className="report-supporting">{report.supporting.map(item => <li key={item.endpoint}>{item.endpoint}: {item.reason}</li>)}</ul></Disclosure>
+        <p className="overview-caption">Source: Microburbs Hackathon API. Returned data may be unavailable or capped by the API. Valuations are estimates; overlays do not replace a planning certificate. Responses stay in this Chrome profile.</p>
+      </Disclosure>
+      <p className="overview-caption report-status">{report.state === 'running' ? `Loading property data · ${report.completed} of ${report.total} requests processed` : report.state === 'paused' ? 'Report paused. Open the full report for details.' : report.errors ? `Report ready · ${report.errors} requests need attention` : 'Property data saved in this Chrome profile.'}</p>
     </>}
   </div>;
 }

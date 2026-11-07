@@ -12,7 +12,7 @@ beforeEach(() => {
   api = { runtime: { getURL: (s: string) => s, openOptionsPage: vi.fn(async () => {}) }, windows: { getCurrent: vi.fn(async () => ({ id: 7 })) }, sidePanel: { open: vi.fn(async () => {}) }, tabs: { query: vi.fn(async () => [{ id: 42 }]), sendMessage: vi.fn(async () => ({ ok: true })) }, storage: { local: { get: vi.fn(async () => structuredClone(stored)), set: vi.fn(async (items: object) => { Object.assign(stored, items); changes.forEach(c => c(items, 'local')); }), remove: vi.fn(async (key: string) => { delete stored[key]; changes.forEach(c => c({ [key]: {} }, 'local')); }) }, onChanged: { addListener: (fn: any) => changes.push(fn), removeListener: (fn: any) => { changes = changes.filter(c => c !== fn); } } } };
   vi.stubGlobal('chrome', api);
 });
-async function mount() { const user = userEvent.setup(); const view = render(<Popup />); await user.click(screen.getByRole('tab', { name: 'Notes' })); await screen.findByText('No saved notes yet'); return { user, ...view }; }
+async function mount() { const user = userEvent.setup(); const view = render(<Popup />); await user.click(screen.getByRole('button', { name: /^Notes/ })); await screen.findByText('No saved notes yet'); return { user, ...view }; }
 const put = (id: string, text: string, createdAt = 1, type = 'manual') => stored['microburbs.note.' + id] = { id, text, createdAt, type };
 it('dispatches side panel immediately in the gesture; options/widget actions report failures and retry', async () => {
   const { user } = await mount();
@@ -38,7 +38,7 @@ it('saves literal multiline Unicode, preserves it across remount and deletes wit
   await user.click(screen.getByRole('button', { name: 'Save note' }));
   expect(Object.values(stored)[0]).toMatchObject({ text, type: 'manual' });
   expect(document.querySelector('script')).toBeNull();
-  unmount(); render(<Popup />); await user.click(screen.getByRole('tab', { name: 'Notes' }));
+  unmount(); render(<Popup />); await user.click(screen.getByRole('button', { name: /^Notes/ }));
   const remove = await screen.findByRole('button', { name: /Delete note:/ });
   remove.focus(); await user.keyboard('{Enter}');
   await screen.findByText('No saved notes yet');
@@ -82,7 +82,7 @@ it('retains valid legacy notes, ordering and rejects malformed stored values', (
 it('removes subscriptions after closing', async () => { const { unmount } = await mount(); expect(changes).toHaveLength(2); unmount(); expect(changes).toHaveLength(0); });
 it('shows initial storage failure without claiming the notepad is empty', async () => {
   api.storage.local.get.mockRejectedValueOnce(new Error()); render(<Popup />);
-  await userEvent.setup().click(screen.getByRole('tab', { name: 'Notes' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: /^Notes/ }));
   expect(await screen.findByText('Saved notes could not be loaded')).toBeVisible();
   expect(screen.queryByText('No saved notes yet')).toBeNull();
 });
@@ -97,4 +97,12 @@ it('preserves another context’s save while a deletion is pending', async () =>
   expect(screen.getByRole('button', { name: /Delete note: Delete this one/ })).toHaveAttribute('aria-disabled', 'true');
   await act(async () => finish()); expect(screen.getByText('Saved elsewhere')).toBeVisible();
   expect(screen.queryByText('Delete this one')).toBeNull();
+});
+
+it('uses the supplied wordmark and official social links', async () => {
+  await mount();
+  expect(screen.getByAltText('Microburbs')).toHaveAttribute('src', 'assets/2b3d1c2b0be2d1ac87bf7a95fac33e3a.webp');
+  expect(screen.getByRole('link', { name: /Microburbs on Instagram/ })).toHaveAttribute('href', 'https://www.instagram.com/microburbs/');
+  expect(screen.getByRole('link', { name: /Microburbs on YouTube/ })).toHaveAttribute('href', 'https://www.youtube.com/channel/UCUollIZedjqNspdu5CjIwBw');
+  expect(screen.getByRole('link', { name: /Microburbs on Facebook/ })).toHaveAttribute('rel', 'noopener noreferrer');
 });

@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { chat } from '../../server/chat';
+import { execFileSync } from 'node:child_process';
 
 const { create } = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('openai', () => ({ default: class { responses = { create }; } }));
@@ -12,6 +13,8 @@ beforeEach(() => {
   vi.stubEnv('OPENAI_REASONING_EFFORT', undefined);
   vi.stubEnv('MICROBURBS_API_BASE_URL', 'https://property.example.test');
   vi.stubEnv('MICROBURBS_API_KEY', 'dummy-property-key');
+  vi.stubEnv('COMPUTE_API_URL', 'https://compute.example.test/api/compute');
+  vi.stubEnv('COMPUTE_SERVICE_TOKEN', 'dummy-compute-token-32-characters-long');
   vi.spyOn(console, 'info').mockImplementation(() => {});
 });
 
@@ -121,4 +124,35 @@ it('propagates client cancellation to the active provider request', async () => 
   await reader.read();
   await reader.cancel();
   expect(providerSignal!.aborted).toBe(true);
+});
+
+it('completes search, real Python computation and explanation within the existing tool budget', async () => {
+  const input = { id: 'GANSW1', inputs: { weekly_rent_aud: { value: 750, quote: '$750 per week', message_index: 0 }, reference_period: { value: 'week', quote: 'The historical listing was weekly.', message_index: 0 } } };
+  create.mockResolvedValueOnce(stream(completed([call('search_address', { address: '26 Tudor Street' })])))
+    .mockResolvedValueOnce(stream(completed([call('compute_rent_comparison', input)])))
+    .mockResolvedValueOnce(stream({ type: 'response.output_text.delta', delta: 'The proposed rent is $30/week above the historical asking rent [S2] [C1].' }, completed()));
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    if (String(url).includes('compute.example')) {
+      const body = execFileSync('python3', ['-c', 'import json,sys; from compute.registry import run; print(json.dumps(run(json.load(sys.stdin))))'], { input: init!.body as string });
+      return Response.json(JSON.parse(body.toString()));
+    }
+    return Response.json({ data: String(url).includes('geocode') ? [{ id: 'GANSW1' }] : { price: 720, type: 'For Rent', date: '2025-07-24', address: '26 Tudor Street' } });
+  });
+  const result = await events(await chat(request([{ role: 'user', content: 'Compare $750 per week for 26 Tudor Street. The historical listing was weekly.' }])));
+  expect(create).toHaveBeenCalledTimes(3);
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  expect(result.find(e => e.type === 'calculation')?.calculation).toMatchObject({ id: 'C1', version: '1.0.0', metrics: [{ value: 720 }, { value: 30 }, { value: 1560 }, { value: 4.17 }] });
+  expect(result.at(-1)).toEqual({ type: 'done' });
+  expect(JSON.stringify(result)).not.toContain('dummy-');
+});
+
+it('turns missing calculation inputs into a follow-up question without contacting Python', async () => {
+  create.mockResolvedValueOnce(stream(completed([call('compute_rent_comparison', { id: 'GANSW1', inputs: { weekly_rent_aud: { value: null, quote: null, message_index: null }, reference_period: { value: null, quote: null, message_index: null } } })])))
+    .mockResolvedValueOnce(stream({ type: 'response.output_text.delta', delta: 'What weekly rent in AUD would you like to compare?' }, completed()));
+  const fetcher = vi.spyOn(globalThis, 'fetch');
+  const result = await events(await chat(request()));
+  expect(fetcher).not.toHaveBeenCalled();
+  const supplied = create.mock.calls[1][0].input.find((item: any) => item.type === 'function_call_output');
+  expect(JSON.parse(supplied.output)).toMatchObject({ status: 'needs_input', missing: [{ key: 'weekly_rent_aud' }, { key: 'reference_period' }] });
+  expect(result.at(-1)).toEqual({ type: 'done' });
 });

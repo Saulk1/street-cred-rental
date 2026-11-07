@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react';
 import { TriangleAlertIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
 import type { ApiSection, LookupError } from '@/types';
 
 export const absent = 'Not available';
@@ -25,12 +21,12 @@ export function Retry({ error, retry }: { error?: LookupError; retry: () => void
     return () => clearTimeout(timer);
   }, [error?.retryAt, now]);
   const waiting = (error?.retryAt ?? 0) > now;
-  return <Alert variant="destructive" role="group"><TriangleAlertIcon aria-hidden="true" /><AlertDescription>
+  return <div className="selection-alert" role="group"><TriangleAlertIcon aria-hidden="true" /><div>
     <p>{error?.message ?? 'Could not look up this property. Please retry.'}</p>
     {error?.requestId && <p>Request ID: {error.requestId}</p>}
     {waiting && <p>Retry available after {new Date(error!.retryAt!).toLocaleTimeString()}.</p>}
-    <Button variant="outline" disabled={waiting} onClick={retry}>Retry</Button>
-  </AlertDescription></Alert>;
+    <button type="button" className="selection-button" disabled={waiting} onClick={retry}>Retry</button>
+  </div></div>;
 }
 
 export type Resource<T> = ApiSection<T> | { status: 'idle' | 'loading' };
@@ -38,7 +34,7 @@ export function ResourceContent<T>({ resource, retry, children }: {
   resource: Resource<T>; retry: () => void; children: (data: T) => React.ReactNode;
 }) {
   if (resource.status === 'error') return <Retry error={resource.error} retry={retry} />;
-  if (resource.status === 'empty') return <Empty><EmptyHeader><EmptyTitle>No data returned</EmptyTitle></EmptyHeader></Empty>;
-  if (resource.status !== 'ok') return <div aria-label="Loading section" aria-busy="true"><Skeleton className="h-16 w-full" /></div>;
+  if (resource.status === 'empty') return <p className="selection-empty">No data returned</p>;
+  if (resource.status !== 'ok') return <p className="selection-loading" aria-busy="true"><span className="native-spinner" aria-hidden="true" />Loading section…</p>;
   return <>{children(resource.data)}</>;
 }

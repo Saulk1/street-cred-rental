@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PropertyChat } from '../../src/chat';
 import { CHAT_KEY } from '../../shared/chat';
 import { contextFor } from '../../src/lib/chat';
+import { calculation } from '../fixtures/calculation';
 
 let stored: Record<string, any>;
 let api: any;
@@ -14,7 +15,7 @@ const reply = (...events: object[]) => new Response(new ReadableStream({ start(c
 
 beforeEach(() => {
   stored = {};
-  api = { runtime: { getManifest: () => ({ host_permissions: ['https://chat.example.test/*'], content_security_policy: { extension_pages: 'connect-src https://chat.example.test' } }) },
+  api = { runtime: { getURL: (path: string) => path, getManifest: () => ({ host_permissions: ['https://chat.example.test/*'], content_security_policy: { extension_pages: 'connect-src https://chat.example.test' } }) },
     storage: { local: { get: vi.fn(async (key: string) => ({ [key]: structuredClone(stored[key]) })), set: vi.fn(async (items: object) => { Object.assign(stored, structuredClone(items)); }), remove: vi.fn(async (key: string) => { delete stored[key]; }) } } };
   vi.stubGlobal('chrome', api);
   vi.stubGlobal('CHAT_API_CONFIG', { baseUrl: 'https://chat.example.test', token: 'dummy-team-token' });
@@ -35,7 +36,8 @@ it('sends, streams plain text safely, saves and restores one thread without read
   await user.click(screen.getByRole('button', { name: 'Send' }));
   await screen.findByText('<img src=x onerror=alert(1)>');
   await waitFor(() => expect(stored[CHAT_KEY]?.at(-1).state).toBe('complete'));
-  expect(document.querySelector('img')).toBeNull();
+  expect(document.querySelector('img[src="x"]')).toBeNull();
+  expect(screen.getByAltText('Microburbs')).toBeVisible();
   expect(api.storage.local.get).toHaveBeenCalledWith(CHAT_KEY);
   expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toEqual({ messages: [{ role: 'user', content: '26 Tudor Street' }] });
   expect(fetcher.mock.calls[0][1]).toMatchObject({ credentials: 'omit', redirect: 'error', headers: { Authorization: 'Bearer dummy-team-token' } });
@@ -124,4 +126,22 @@ it('does not overwrite a saved thread when closed before storage restoration fin
   await act(async () => { resolve({ [CHAT_KEY]: [] }); });
   expect(api.storage.local.set).not.toHaveBeenCalled();
   expect(api.storage.local.remove).not.toHaveBeenCalled();
+});
+
+it('shows calculation metrics, inputs and limitations and preserves them across reopening', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(reply(
+    { type: 'source', source: { id: 'S1', label: 'Latest historical rent', path: '/v1/properties/GANSW1/rent-history-latest' } },
+    { type: 'calculation', calculation }, { type: 'delta', text: 'The weekly difference is $30 [C1].' }, { type: 'done' }));
+  const user = userEvent.setup(); const view = await mount();
+  await user.type(screen.getByRole('textbox', { name: 'Message' }), '$750 per week{Enter}');
+  await user.click(await screen.findByRole('button', { name: 'C1 · Rent comparison' }));
+  expect(screen.getByText('30 AUD/week')).toBeVisible();
+  expect(screen.getByText(/You wrote: “\$750 per week”/)).toBeVisible();
+  expect(screen.getByText('Historical asking rent; not a current rental valuation.')).toBeVisible();
+  await waitFor(() => expect(stored[CHAT_KEY].at(-1).calculations).toEqual([calculation]));
+  view.unmount(); await mount();
+  const trigger = screen.getByRole('button', { name: 'C1 · Rent comparison' });
+  trigger.focus(); await user.keyboard('{Enter}');
+  expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('30 AUD/week')).toBeVisible();
 });

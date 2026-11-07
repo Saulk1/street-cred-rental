@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { receiveChat } from '../../src/lib/chat';
+import { receiveChat, readThread, contextFor } from '../../src/lib/chat';
+import { calculation } from '../fixtures/calculation';
 
 const history = [{ id: 'user', role: 'user' as const, content: '你好', state: 'complete' as const, sources: [] }];
 beforeEach(() => {
@@ -33,4 +34,24 @@ it.each([
 ])('rejects truncated, malformed and oversized answers', async text => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(response(text));
   await expect(receiveChat(history, new AbortController().signal, vi.fn())).rejects.toThrow();
+});
+
+const sourceEvent = { type: 'source', source: { id: 'S1', label: 'Latest rent', path: '/v1/properties/GANSW1/rent-history-latest' } };
+it('validates streamed calculation records and restores older threads without losing data', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(response([sourceEvent, { type: 'calculation', calculation }, { type: 'done' }].map(e => JSON.stringify(e)).join('\n')));
+  const receive = vi.fn(); await receiveChat(history, new AbortController().signal, receive);
+  expect(receive).toHaveBeenCalledWith({ type: 'calculation', calculation });
+  expect(readThread(history)[0].calculations).toEqual([]);
+  const thread = readThread([{ ...history[0], role: 'assistant', sources: [sourceEvent.source], calculations: [calculation] }]);
+  expect(thread[0].calculations).toEqual([calculation]);
+  expect(contextFor([...thread, ...history])).toEqual([{ role: 'assistant', content: '你好' }, { role: 'user', content: '你好' }]);
+});
+
+it('rejects unknown sources, duplicate calculations and malformed saved results', async () => {
+  for (const events of [[{ type: 'calculation', calculation }], [sourceEvent, { type: 'calculation', calculation }, { type: 'calculation', calculation }],
+    [sourceEvent, { type: 'calculation', calculation: { ...calculation, metrics: [{ ...calculation.metrics[0], value: '30' }] } }]]) {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(response(events.map(e => JSON.stringify(e)).join('\n')));
+    await expect(receiveChat(history, new AbortController().signal, vi.fn())).rejects.toThrow();
+  }
+  expect(() => readThread([{ ...history[0], calculations: [calculation] }])).toThrow('Invalid saved calculations');
 });

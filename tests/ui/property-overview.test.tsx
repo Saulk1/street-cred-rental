@@ -23,7 +23,7 @@ beforeEach(() => {
 
 it('compares an entered rent with a labelled observation and retains it across tab switches', async () => {
   const user = userEvent.setup(); render(<PropertyOverview report={report} />);
-  expect(await screen.findByRole('heading', { name: /\$720\s*\/wk/ })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: /^\$720$/ })).toBeVisible();
   expect(screen.getByText(/past listing, not a current rent estimate/)).toBeVisible();
   const input = screen.getByLabelText('Compare with the asking rent');
   await user.type(input, '750');
@@ -37,7 +37,7 @@ it('compares an entered rent with a labelled observation and retains it across t
   expect(input).toHaveValue('750');
   await user.clear(input); await user.type(input, '-1');
   expect(input).toHaveAttribute('aria-invalid', 'true');
-  expect(input).toHaveAccessibleDescription(/Enter a weekly amount/);
+  expect(input).toHaveAccessibleDescription(/Enter an amount/);
 });
 
 it('expands saved comparable sales and distinguishes overlays from risk ratings', async () => {
@@ -49,13 +49,13 @@ it('expands saved comparable sales and distinguishes overlays from risk ratings'
   expect(screen.getByText('Nearby home 4')).toBeVisible();
   expect(screen.getByText('No overlay at point')).toBeVisible();
   expect(screen.getByText('Overlay at address')).toBeVisible();
-  expect(screen.getByText('A score is not available from this API.')).toBeVisible();
+  expect(screen.getByText('Not enough data to calculate a score')).toBeVisible();
 });
 
 it('keeps missing rent and zero rent distinct without fabricating a comparison', async () => {
   payloads['/rent-history-latest'] = { price: 0 };
   const user = userEvent.setup(); render(<PropertyOverview report={report} />);
-  expect(await screen.findByRole('heading', { name: /\$0\s*\/wk/ })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: /^\$0$/ })).toBeVisible();
   await user.type(screen.getByLabelText('Compare with the asking rent'), '750');
   expect(screen.queryByText(/% above/)).toBeNull();
 });
@@ -82,4 +82,30 @@ it('saves only the confirmed address and reports clipboard failure', async () =>
   await user.click(screen.getByRole('button', { name: 'Share this home' }));
   expect(copy).toHaveBeenCalledWith('26 Example St');
   expect(screen.getByRole('status')).toHaveTextContent('Could not copy the address');
+});
+
+it('computes wellbeing from the saved suburb response and exposes its inputs in both views', async () => {
+  payloads['suburb-livability'] = { area_name: 'Surry Hills (NSW)', area_level: 'suburb', scores: [
+    { key: 'lifestyle', value: 70 }, { key: 'convenience', value: 80 }, { key: 'family', value: 60 }, { key: 'safety', value: 90 }, { key: 'tranquility', value: 60 },
+  ] };
+  report.tasks.push({ id: 'suburb-livability', endpoint: '/v1/suburbs/{suburb_name}/lifestyle/livability', title: 'Livability', group: 'Suburb', status: 'ok', savedAt: 1 });
+  const user = userEvent.setup(); render(<PropertyOverview report={report} />);
+  const meter = await screen.findByRole('meter', { name: 'Neighbourhood wellbeing' });
+  expect(meter).toHaveAttribute('value', '72');
+  expect(screen.getByText('Surry Hills (NSW) · 5 of 5 indicators')).toBeVisible();
+  await user.click(screen.getByText('View five indicators'));
+  expect(screen.getByText('Lifestyle')).toBeVisible();
+  expect(screen.getByText('90 / 100')).toBeVisible();
+  await user.click(screen.getByRole('tab', { name: 'Buy' }));
+  expect(meter).toBeVisible();
+});
+
+it('supports arrow keys, Home and End without losing the rent input', async () => {
+  const user = userEvent.setup(); render(<PropertyOverview report={report} />);
+  const rental = screen.getByRole('tab', { name: 'Rental' });
+  rental.focus(); await user.keyboard('{ArrowRight}');
+  expect(screen.getByRole('tab', { name: 'Buy' })).toHaveFocus();
+  expect(screen.getByRole('tab', { name: 'Buy' })).toHaveAttribute('aria-selected', 'true');
+  await user.keyboard('{Home}'); expect(rental).toHaveFocus();
+  await user.keyboard('{End}'); expect(screen.getByRole('tab', { name: 'Buy' })).toHaveFocus();
 });

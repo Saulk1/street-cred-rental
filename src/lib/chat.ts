@@ -1,4 +1,5 @@
 import { lines, validHistory, type ChatEvent, type ChatMessage } from '../../shared/chat';
+import { validCalculation } from '../../shared/compute';
 
 declare global { var CHAT_API_CONFIG: { baseUrl?: string; token?: string } | undefined; }
 
@@ -28,7 +29,11 @@ export function readThread(value: unknown): ChatMessage[] {
       || typeof m.content !== 'string' || m.content.length > 4000
       || !['complete', 'incomplete'].includes(m.state) || !Array.isArray(m.sources)
       || m.sources.length > 30 || !m.sources.every(source)) throw new Error('Invalid saved conversation.');
-    return { id: m.id, role: m.role, content: m.content, state: m.state, sources: m.sources };
+    const calculations = m.calculations ?? [];
+    if (!Array.isArray(calculations) || calculations.length > 6 || !calculations.every(validCalculation)
+      || new Set(calculations.map(c => c.id)).size !== calculations.length
+      || calculations.some(c => c.apiInputs.some(d => !m.sources.some((s: { id: string }) => s.id === d.sourceId)))) throw new Error('Invalid saved calculations.');
+    return { id: m.id, role: m.role, content: m.content, state: m.state, sources: m.sources, calculations };
   });
 }
 
@@ -52,6 +57,8 @@ export async function receiveChat(messages: ChatMessage[], signal: AbortSignal, 
   if (!response.body || !response.headers.get('Content-Type')?.startsWith('application/x-ndjson')) throw new Error('The chat response was invalid.');
   let characters = 0;
   let events = 0;
+  const sources = new Set<string>();
+  const calculations = new Set<string>();
   for await (const line of lines(response.body, signal)) {
     if (++events > 10000) throw new Error('The answer was too long.');
     const event = JSON.parse(line);
@@ -61,7 +68,12 @@ export async function receiveChat(messages: ChatMessage[], signal: AbortSignal, 
     if (event.type === 'delta' && typeof event.text === 'string') {
       characters += event.text.length;
       if (characters > 4000) throw new Error('The answer was too long.');
-    } else if (event.type === 'source' && source(event.source)) { /* Valid source. */ }
+    } else if (event.type === 'source' && source(event.source) && sources.size < 30 && !sources.has(event.source.id)) {
+      sources.add(event.source.id);
+    } else if (event.type === 'calculation' && validCalculation(event.calculation) && calculations.size < 6
+      && !calculations.has(event.calculation.id) && event.calculation.apiInputs.every((d: { sourceId: string }) => sources.has(d.sourceId))) {
+      calculations.add(event.calculation.id);
+    }
     else if (event.type === 'tool' && typeof event.id === 'string' && event.id.length <= 200
       && typeof event.label === 'string' && event.label.length < 300 && ['running', 'done', 'error'].includes(event.status)) { /* Valid activity. */ }
     else throw new Error('The chat response was invalid.');

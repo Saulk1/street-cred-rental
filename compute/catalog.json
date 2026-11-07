@@ -1,0 +1,21 @@
+[
+  {
+    "id": "rent_comparison",
+    "version": "1.0.0",
+    "title": "Rent comparison",
+    "description": "Compare a user-stated proposed weekly rent in AUD with this property's latest historical rental listing. This is not a rental valuation. The API does not specify the historical rent period: ask the user to confirm whether that listing amount is per week, fortnight, month or year. Never assume its period from the proposed rent's period. Copy each value and a short exact supporting quote from a user message; message_index is its zero-based index in this request's conversation. Use null for unknown values; never guess or use assistant text as evidence.",
+    "inputs": [
+      { "key": "weekly_rent_aud", "type": "number", "label": "Proposed weekly rent", "unit": "AUD/week", "minimum": 0, "maximum": 1000000 },
+      { "key": "reference_period", "type": "enum", "label": "Historical listing rent period", "unit": "period", "options": ["week", "fortnight", "month", "year"], "evidence": { "week": ["week", "weekly", "wk", "每周", "每週", "周租", "週租"], "fortnight": ["fortnight", "fortnightly", "两周", "兩週"], "month": ["month", "monthly", "每月", "月租"], "year": ["year", "yearly", "annual", "annually", "每年", "年租"] } }
+    ],
+    "datasets": [
+      { "key": "latest_rent", "section": "market", "part": "rent", "coverage": "Single latest rental observation. The API does not specify its rent period; the user must confirm it. Not an estimated current market rent." }
+    ],
+    "metrics": [
+      { "key": "reference_weekly_rent", "label": "Historical asking rent converted to weekly", "unit": "AUD/week" },
+      { "key": "weekly_difference", "label": "Weekly difference", "unit": "AUD/week" },
+      { "key": "annual_difference", "label": "Annual difference", "unit": "AUD/year" },
+      { "key": "difference_percent", "label": "Difference from historical asking rent", "unit": "%" }
+    ]
+  }
+]

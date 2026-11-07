@@ -14,10 +14,11 @@ const payloads = {
   '/amenities/nearby': { results: [{ name: 'Example Park', category: 'Park', distance_m: 400 }, { name: 'Example Supermarket', category: 'Supermarket', distance_m: 400 }, { name: 'Example GP Clinic', category: 'Medical', distance_m: 700 }] },
   '/risks/all': { flood: [], bushfire: [{ on_property: false }] },
 };
+payloads['/lifestyle/livability'] = { area_name: 'Surry Hills (NSW)', area_level: 'suburb', scores: [{ key: 'lifestyle', value: 70 }, { key: 'convenience', value: 80 }, { key: 'family', value: 60 }, { key: 'safety', value: 90 }, { key: 'tranquility', value: 60 }] };
 const report = {
   id: 'preview-report', candidate: { id: 'GANSWEXAMPLE', label: 'Example home, Sydney NSW' }, state: 'complete', selectedAt: 1, updatedAt: Date.now(),
-  total: 8, completed: 8, errors: 0, supporting: [],
-  tasks: Object.keys(payloads).map(path => ({ id: path, endpoint: '/v1/properties/{gnaf_id}' + path, group: 'Example data', title: path.slice(1), status: 'ok', savedAt: 1 })),
+  total: 9, completed: 9, errors: 0, supporting: [],
+  tasks: Object.keys(payloads).map(path => ({ id: path, endpoint: (path === '/lifestyle/livability' ? '/v1/suburbs/{suburb_name}' : '/v1/properties/{gnaf_id}') + path, group: 'Example data', title: path.slice(1), status: 'ok', savedAt: 1 })),
 };
 const listeners = new Set();
 const notes = {};

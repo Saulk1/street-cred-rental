@@ -8,10 +8,12 @@
   max-inline-size: calc(100vw - 32px);
   max-block-size: calc(100dvh - 32px);
   overflow: auto;
-  border-radius: 12px;
+  border: 1px solid #dce4f1;
+  border-radius: 20px;
   background: #fff;
-  color: #183d32;
-  font: 14px/1.5 system-ui, sans-serif;
-  box-shadow: 0 8px 32px #183d3224;
+  color: #092b73;
+  font: 14px/1.5 Arial, Helvetica, sans-serif;
+  box-shadow: 0 8px 32px #173a761f;
 }
 #microburbs-facts-widget[hidden] { display: none; }
+:host { --primary: #0066ff; --foreground: #092b73; --muted-foreground: #647188; --border: #dce4f1; --secondary: #e5efff; --ring: #0066ff; }

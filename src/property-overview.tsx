@@ -1,15 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRightIcon, BookmarkIcon, CheckIcon, FlameIcon, HeartPulseIcon, HouseIcon, KeyRoundIcon, LeafIcon, MapPinIcon, Share2Icon, ShoppingCartIcon, TrainFrontIcon, TreePineIcon, Volume2Icon, WavesIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Field, FieldGroup, FieldLabel, FieldDescription } from '@/components/ui/field';
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Spinner } from '@/components/ui/spinner';
+import { calculateWellbeing } from '@/lib/wellbeing';
 import type { ReportSnapshot } from '@/property-report';
 import type { Candidate } from '@/types';
 
@@ -18,16 +9,17 @@ const record = (value: unknown): RecordData => value !== null && typeof value ==
 const number = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
 const text = (value: unknown): string | null => typeof value === 'string' && value.trim() ? value : null;
 const money = (value: unknown) => number(value) === null ? 'Not available' : new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(value as number);
-const distance = (value: unknown) => number(value) === null ? null : (value as number) < 1000 ? `${Math.round(value as number)} m` : `${((value as number) / 1000).toFixed(1)} km`;
+const shortMoney = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', notation: 'compact', maximumFractionDigits: 0 }).format(value);
+const distance = (value: unknown) => number(value) === null || (value as number) < 0 ? null : (value as number) < 1000 ? `${Math.round(value as number)} m` : `${((value as number) / 1000).toFixed(1)} km`;
 function date(value: unknown) {
   if (typeof value !== 'string') return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toLocaleDateString('en-AU', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
-// Read only saved report envelopes. This view never starts a separate API lookup.
-function useReportData(report: ReportSnapshot, suffix: string) {
-  const task = report.tasks.find(item => item.endpoint.startsWith('/v1/properties/') && item.endpoint.endsWith(suffix));
+// Summary cards read saved envelopes, never starting duplicate upstream calls.
+function useReportData(report: ReportSnapshot, suffix: string, scope = 'properties') {
+  const task = report.tasks.find(item => item.endpoint.startsWith(`/v1/${scope}/`) && item.endpoint.endsWith(suffix));
   const key = `${report.id}:${task?.id}:${task?.savedAt}:${task?.status}`;
   const [result, setResult] = useState<{ key: string; data?: unknown; error?: boolean }>();
   useEffect(() => {
@@ -42,28 +34,28 @@ function useReportData(report: ReportSnapshot, suffix: string) {
     return () => { active = false; };
   }, [key, report.id, task?.id, task?.status]);
   const current = result?.key === key ? result : undefined;
-  const loading = task?.status === 'pending' || task?.status === 'loading' || task?.status === 'ok' && !current;
-  return { data: current?.data, loading, failed: task?.status === 'error' || !!current?.error };
+  return { data: current?.data, loading: task?.status === 'pending' || task?.status === 'loading' || task?.status === 'ok' && !current, failed: task?.status === 'error' || !!current?.error };
 }
 type SavedData = ReturnType<typeof useReportData>;
 function Unavailable({ source }: { source: SavedData }) {
-  return source.loading ? <Skeleton className="h-12 w-full" aria-label="Loading saved property data" /> : <p className="overview-muted">{source.failed ? 'Could not load this data. Retry it in the full report below.' : 'No data returned for this address.'}</p>;
+  return <p className="overview-muted" aria-busy={source.loading || undefined}>{source.loading ? 'Loading saved data…' : source.failed ? 'Could not load this data. Retry it in the full report below.' : 'No data returned for this address.'}</p>;
 }
 function SectionCard({ title, caption, children, footer }: { title: string; caption?: string; children: ReactNode; footer?: ReactNode }) {
-  return <Card><CardHeader><div className="overview-section-heading"><CardTitle><h2>{title}</h2></CardTitle>{caption && <span className="overview-caption">{caption}</span>}</div></CardHeader><CardContent>{children}</CardContent>{footer && <CardFooter>{footer}</CardFooter>}</Card>;
+  return <article className="overview-card"><header className="overview-section-heading"><h2>{title}</h2>{caption && <span className="overview-caption">{caption}</span>}</header>{children}{footer && <footer>{footer}</footer>}</article>;
 }
 
 function Valuation({ source, sale }: { source: SavedData; sale: SavedData }) {
   const data = record(source.data), last = record(sale.data);
   const price = number(data.predicted_price), low = number(data.predicted_price_low), high = number(data.predicted_price_high), confidence = number(data.confidence_score);
-  return <Card><CardHeader><CardDescription><span className="overview-eyebrow">Estimated property value</span></CardDescription><CardTitle><h2 className="overview-price">{source.loading ? 'Loading…' : price === null ? 'Not available' : money(price)}</h2></CardTitle></CardHeader><CardContent className="flex flex-col gap-4">
-    {source.loading ? <Unavailable source={source} /> : price !== null ? <>
-      {low !== null && high !== null && <div className="valuation-interval"><div className="valuation-range" aria-hidden="true"><span /></div><div className="range-labels"><span>Low <strong>{money(low)}</strong></span><span>80% range</span><span>High <strong>{money(high)}</strong></span></div></div>}
-      <div className="overview-confidence"><span>Model confidence</span><strong>{confidence !== null && confidence >= 0 && confidence <= 100 ? `${confidence} / 100` : 'Not available'}</strong></div>
-      <p className="overview-caption">{date(data.prediction_date) ? `Model dated ${date(data.prediction_date)}. ` : ''}An estimate, not a formal appraisal.</p>
-    </> : <Unavailable source={source} />}
-    <Separator /><div className="overview-detail-row"><div><h3>{text(last.type)?.toLowerCase() === 'sold' ? 'Last sale' : 'Latest sale listing'}</h3><p className="overview-muted">{[text(last.type), date(last.date)].filter(Boolean).join(' · ') || 'No sale record returned'}</p></div><strong>{money(last.price)}</strong></div>
-  </CardContent></Card>;
+  const marker = price !== null && low !== null && high !== null && high > low ? Math.max(0, Math.min(100, (price - low) / (high - low) * 100)) : null;
+  return <article className="overview-card valuation-card"><header><p className="overview-eyebrow">Estimated property value</p><h2 className="overview-price">{source.loading ? 'Loading…' : price === null ? 'Not available' : money(price)}</h2></header>
+    {source.loading || price === null ? <Unavailable source={source} /> : <>
+      {marker !== null && low !== null && high !== null && <div className="valuation-interval"><div className="valuation-range" aria-hidden="true"><span /><i style={{ '--marker': `${marker}%` } as CSSProperties} /></div><div className="range-labels"><span>Low <strong title={money(low)}>{shortMoney(low)}</strong></span><span>80% valuation range</span><span>High <strong title={money(high)}>{shortMoney(high)}</strong></span></div></div>}
+      <div className="overview-confidence"><span>Confidence</span>{confidence !== null && confidence >= 0 && confidence <= 100 ? <><meter min={0} max={100} value={confidence} aria-label="Model confidence" /><strong>{confidence} / 100</strong></> : <strong>Not available</strong>}</div>
+    </>}
+    <div className="overview-detail-row sale-observation"><div><h3>{text(last.type)?.toLowerCase() === 'sold' ? 'Last sale' : 'Latest sale listing'}</h3><p className="overview-muted">{[text(last.type), date(last.date)].filter(Boolean).join(' · ') || 'No sale record returned'}</p></div><strong>{money(last.price)}</strong></div>
+    <p className="overview-caption">{date(data.prediction_date) ? `Model dated ${date(data.prediction_date)}. ` : ''}Model estimate; not a formal appraisal.</p>
+  </article>;
 }
 
 function Rental({ source, asking, onAskingChange }: { source: SavedData; asking: string; onAskingChange: (value: string) => void }) {
@@ -71,25 +63,25 @@ function Rental({ source, asking, onAskingChange }: { source: SavedData; asking:
   const entered = asking.trim() ? Number(asking) : null;
   const valid = entered === null || Number.isFinite(entered) && entered >= 0;
   const difference = valid && entered !== null && rent !== null && rent > 0 ? (entered - rent) / rent * 100 : null;
-  return <Card><CardHeader><CardDescription><span className="overview-eyebrow">Latest advertised weekly rent</span></CardDescription><CardTitle><h2 className="overview-price">{source.loading ? 'Loading…' : rent === null ? 'Not available' : <>{money(rent)}<span>/wk</span></>}</h2></CardTitle></CardHeader><CardContent className="flex flex-col gap-4">
-    {source.loading ? <Unavailable source={source} /> : <p className="overview-muted">{rent === null ? 'No rental observation returned for this address.' : `Advertised ${date(data.date) ?? 'on an unknown date'}. This is a past listing, not a current rent estimate.`}</p>}
-    <Separator /><FieldGroup><Field data-invalid={!valid || undefined}><FieldLabel htmlFor="asking-rent">Compare with the asking rent</FieldLabel><FieldDescription id="asking-rent-hint">Optional. Enter the weekly rent from the listing.</FieldDescription><InputGroup><InputGroupAddon><InputGroupText>$</InputGroupText></InputGroupAddon><InputGroupInput id="asking-rent" name="asking-rent" inputMode="decimal" autoComplete="off" placeholder="Enter asking rent" value={asking} onChange={event => onAskingChange(event.target.value)} aria-describedby={`asking-rent-hint${!valid ? ' asking-rent-error' : ''}`} aria-invalid={!valid || undefined} /><InputGroupAddon align="inline-end"><InputGroupText>/wk</InputGroupText></InputGroupAddon></InputGroup>{!valid && <FieldDescription id="asking-rent-error">Enter a weekly amount of zero or more.</FieldDescription>}</Field></FieldGroup>
-    {difference !== null && <p className="rent-comparison"><ArrowRightIcon className="size-4" aria-hidden="true" />{Math.abs(difference) < 0.5 ? 'Asking rent matches the last advertised rent.' : `Asking rent is ${Math.round(Math.abs(difference))}% ${difference > 0 ? 'above' : 'below'} the last advertised rent.`}</p>}
+  return <article className="overview-card rental-card"><header><p className="overview-eyebrow">Latest advertised rent</p><h2 className="overview-price">{source.loading ? 'Loading…' : rent === null ? 'Not available' : money(rent)}</h2></header>
+    {source.loading ? <Unavailable source={source} /> : <p className="overview-caption">{rent === null ? 'No rental observation returned for this address.' : `Advertised ${date(data.date) ?? 'on an unknown date'}. A past listing, not a current rent estimate. The API does not specify its rent period.`}</p>}
+    <div className="asking-rent"><label htmlFor="asking-rent">Compare with the asking rent</label><p id="asking-rent-hint" className="overview-muted">Optional. Enter an amount for the same rent period.</p><div className="rent-input"><span aria-hidden="true">$</span><input id="asking-rent" name="asking-rent" inputMode="decimal" autoComplete="off" placeholder="Enter listing amount" value={asking} onChange={event => onAskingChange(event.target.value)} aria-describedby={`asking-rent-hint${!valid ? ' asking-rent-error' : ''}`} aria-invalid={!valid || undefined} /><span aria-hidden="true">AUD</span></div>{!valid && <p id="asking-rent-error" className="popup-field-error">Enter an amount of zero or more.</p>}</div>
+    {difference !== null && <p className="rent-comparison"><ArrowRightIcon aria-hidden="true" />{Math.abs(difference) < 0.5 ? 'Asking rent matches the last advertised rent.' : `Asking rent is ${Math.round(Math.abs(difference))}% ${difference > 0 ? 'above' : 'below'} the last advertised rent.`}</p>}
     {valid && entered !== null && rent === null && <p className="overview-caption">A comparison needs a saved rental observation for this address.</p>}
-  </CardContent></Card>;
+  </article>;
 }
 
 function ComparableSales({ source }: { source: SavedData }) {
   const [expanded, setExpanded] = useState(false);
   const rows = Array.isArray(source.data) ? source.data.map(record) : [];
-  return <SectionCard title="Recent comparable sales" caption="Nearby sales" footer={rows.length > 3 ? <Button variant="link" onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer sales' : `See all ${rows.length} comparable sales`}<ArrowRightIcon data-icon="inline-end" aria-hidden="true" /></Button> : undefined}>
+  return <SectionCard title="Recent comparable sales" caption="Nearby sales" footer={rows.length > 3 ? <button className="popup-link" onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer sales' : `See all ${rows.length} comparable sales`}<ArrowRightIcon aria-hidden="true" /></button> : undefined}>
     {!rows.length ? <Unavailable source={source} /> : <ul className="overview-list">{rows.slice(0, expanded ? rows.length : 3).map((row, index) => <li className="overview-detail-row" key={index}><div><h3>{text(row.address) ?? text(row.street) ?? 'Address not supplied'}</h3><p className="overview-muted">{[number(row.bedrooms) !== null ? `${row.bedrooms} bed` : null, number(row.dist_km) !== null ? `${row.dist_km} km` : null, date(row.date_sold) ? `Sold ${date(row.date_sold)}` : null].filter(Boolean).join(' · ') || 'Sale details not supplied'}</p></div><strong>{money(row.price)}</strong></li>)}</ul>}
   </SectionCard>;
 }
 
 function Planning({ source }: { source: SavedData }) {
   const data = record(source.data);
-  return <SectionCard title="Planning & zoning" caption="At this address"><div className="overview-detail-row"><span className="overview-icon"><MapPinIcon aria-hidden="true" /></span><div className="flex-1">{text(data.code) || text(data.name) ? <><h3>{[text(data.code), text(data.name)].filter(Boolean).join(' · ')}</h3><p className="overview-muted">{text(data.category) ?? 'Primary planning zone'}</p></> : <Unavailable source={source} />}</div></div><p className="overview-caption mt-3">Nearby development applications are not supplied by this API.</p></SectionCard>;
+  return <SectionCard title="Planning & zoning" caption="At this address"><div className="overview-detail-row"><span className="overview-icon"><MapPinIcon aria-hidden="true" /></span><div>{text(data.code) || text(data.name) ? <><h3>{[text(data.code), text(data.name)].filter(Boolean).join(' · ')}</h3><p className="overview-muted">{text(data.category) ?? 'Primary planning zone'}</p></> : <Unavailable source={source} />}</div></div><p className="overview-caption">Nearby development applications are not supplied by this API.</p></SectionCard>;
 }
 
 function EnvironmentalRisks({ source }: { source: SavedData }) {
@@ -98,13 +90,13 @@ function EnvironmentalRisks({ source }: { source: SavedData }) {
     const records = Array.isArray(data[key]) ? (data[key] as unknown[]).map(record) : null;
     const onProperty = records?.some(item => item.on_property === true);
     const clear = records !== null && (records.length === 0 || records.every(item => item.on_property === false));
-    return <div key={key} className="overview-risk"><h3><Icon className="size-4" aria-hidden="true" />{title}</h3><Badge variant={onProperty ? 'destructive' : 'secondary'}>{source.loading ? 'Loading' : onProperty ? 'Overlay at address' : clear ? 'No overlay at point' : 'Not available'}</Badge></div>;
-  })}</div><p className="overview-caption mt-3">Address-point overlays are not a risk rating or a planning certificate.</p></SectionCard>;
+    return <div key={key} className="overview-risk"><h3><Icon aria-hidden="true" />{title}</h3><span className="popup-badge" data-tone={onProperty ? 'warning' : 'neutral'}>{source.loading ? 'Loading' : onProperty ? 'Overlay at address' : clear ? 'No overlay at point' : 'Not available'}</span></div>;
+  })}</div><p className="overview-caption">Address-point overlays are not a risk rating or a planning certificate.</p></SectionCard>;
 }
 
 function Living({ amenities, transport }: { amenities: SavedData; transport: SavedData }) {
   const places = Array.isArray(record(amenities.data).results) ? (record(amenities.data).results as unknown[]).map(record) : [];
-  const stops = Object.values(record(record(transport.data).nearest)).map(record).filter(item => number(item.distance_m) !== null).sort((a, b) => (a.distance_m as number) - (b.distance_m as number));
+  const stops = Object.values(record(record(transport.data).nearest)).map(record).filter(item => number(item.distance_m) !== null && (item.distance_m as number) >= 0).sort((a, b) => (a.distance_m as number) - (b.distance_m as number));
   function nearest(pattern: RegExp) { return places.filter(item => pattern.test(String(item.category))).sort((a, b) => (number(a.distance_m) ?? Infinity) - (number(b.distance_m) ?? Infinity))[0]; }
   const rows = [
     { title: 'Public transport', icon: TrainFrontIcon, value: stops[0], loading: transport.loading },
@@ -112,9 +104,17 @@ function Living({ amenities, transport }: { amenities: SavedData; transport: Sav
     { title: 'Supermarkets & services', icon: ShoppingCartIcon, value: nearest(/supermarket|grocery|pharmacy/i), loading: amenities.loading },
     { title: 'Healthcare & community', icon: HeartPulseIcon, value: nearest(/health|medical|hospital|clinic|library|community/i), loading: amenities.loading },
     { title: 'Noise exposure', icon: Volume2Icon, value: undefined, loading: false },
-    { title: 'Street greenery', icon: LeafIcon, value: undefined, loading: false },
+    { title: 'Greenery', icon: LeafIcon, value: undefined, loading: false },
   ];
-  return <SectionCard title="Everyday living" caption="Distances from this address"><ul className="overview-list">{rows.map(({ title, icon: Icon, value, loading }) => <li className="overview-living-row" key={title}><span className="overview-icon"><Icon aria-hidden="true" /></span><div><h3>{title}</h3><p className="overview-muted">{loading ? 'Loading saved data…' : value ? [text(value.name) ?? text(value.label) ?? text(value.category), distance(value.distance_m)].filter(Boolean).join(' · ') || 'Distance not supplied' : 'Not available in the returned data'}</p></div></li>)}</ul></SectionCard>;
+  return <SectionCard title="Everyday living" caption="Straight-line distances"><ul className="overview-list">{rows.map(({ title, icon: Icon, value, loading }) => <li className="overview-living-row" key={title}><span className="overview-icon"><Icon aria-hidden="true" /></span><div><h3>{title}</h3><p className="overview-muted">{loading ? 'Loading saved data…' : value ? [text(value.name) ?? text(value.label) ?? text(value.category), distance(value.distance_m)].filter(Boolean).join(' · ') || 'Distance not supplied' : 'Not available in the returned data'}</p></div>{value && distance(value.distance_m) && <span className="popup-badge">{distance(value.distance_m)}</span>}</li>)}</ul></SectionCard>;
+}
+
+function Wellbeing({ source }: { source: SavedData }) {
+  const index = calculateWellbeing(source.data);
+  return <article className="overview-wellbeing" aria-busy={source.loading || undefined}><div className="wellbeing-intro"><div className="wellbeing-ring" data-unavailable={index.value === null} style={{ '--score': index.value ?? 0 } as CSSProperties} aria-hidden="true"><span>{source.loading ? '…' : index.value ?? '—'}</span></div><div><h2>Neighbourhood wellbeing</h2><p className="overview-muted">{source.loading ? 'Calculating from saved data…' : index.value !== null ? `${index.value} / 100 · Calculated suburb index` : 'Not enough data to calculate a score'}</p>{index.area && <p className="overview-caption">{index.area} · {index.available} of {index.total} indicators</p>}</div></div>
+    {index.value !== null && <meter className="popup-sr-only" min={0} max={100} value={index.value} aria-label="Neighbourhood wellbeing" aria-valuetext={`${index.value} out of 100; ${index.available} of ${index.total} indicators; ${index.area}`} />}
+    <details className="wellbeing-details"><summary>View five indicators <ArrowRightIcon aria-hidden="true" /></summary><div className="wellbeing-breakdown"><p className="overview-muted">Equal-weight average of available lifestyle, convenience, family, safety and tranquility scores for this suburb. At least three of five are required. This prototype index describes suburb context.</p><dl>{index.scores.map(row => <div key={row.key}><dt>{row.label}</dt><dd>{row.value === null ? 'Not available' : `${row.value} / 100`}</dd></div>)}</dl><p className="overview-caption">Source: saved Microburbs suburb livability data. Missing indicators are excluded, and the average is rounded once.</p></div></details>
+  </article>;
 }
 
 export function PropertyOverview({ report, onSave }: { report: ReportSnapshot; onSave?: (candidate: Candidate) => Promise<void> }) {
@@ -126,31 +126,37 @@ export function PropertyOverview({ report, onSave }: { report: ReportSnapshot; o
   const amenities = useReportData(report, '/amenities/nearby');
   const transport = useReportData(report, '/transport/nearby');
   const risks = useReportData(report, '/risks/all');
+  const livability = useReportData(report, '/lifestyle/livability', 'suburbs');
   const [asking, setAsking] = useState('');
   const [mode, setMode] = useState('rental');
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [status, setStatus] = useState('');
   const [changeHelp, setChangeHelp] = useState(false);
+  const tabsId = useId();
   async function save() {
-    if (!onSave || saving) return;
-    setSaving(true); setStatus('');
+    if (!onSave || savingRef.current) return;
+    savingRef.current = true; setSaving(true); setStatus('');
     try { await onSave(report.candidate); setStatus('Address saved to your notes.'); }
     catch { setStatus('Could not save the address. Please try again.'); }
-    finally { setSaving(false); }
+    finally { savingRef.current = false; setSaving(false); }
   }
   async function share() {
     try { await navigator.clipboard.writeText(report.candidate.label); setStatus('Address copied. Paste it into a message to share this home.'); }
     catch { setStatus('Could not copy the address. Select and copy the address above.'); }
   }
   return <div className="overview-stack">
-    <Card size="sm"><CardHeader><div className="overview-address"><span className="overview-icon"><MapPinIcon aria-hidden="true" /></span><div><CardDescription><span className="overview-confirmed"><CheckIcon className="size-3" aria-hidden="true" />Confirmed address</span></CardDescription><CardTitle><h1>{report.candidate.label}</h1></CardTitle></div><Button variant="link" size="sm" onClick={() => setChangeHelp(value => !value)} aria-expanded={changeHelp} aria-controls="change-address-help">Change</Button></div>{changeHelp && <CardDescription id="change-address-help">Select another address on a webpage, choose Look up property, and confirm the match. Then reopen this popup.</CardDescription>}</CardHeader></Card>
-    <Tabs value={mode} onValueChange={setMode} className="gap-3"><TabsList className="w-full min-h-12" aria-label="Property research"><TabsTrigger value="rental"><KeyRoundIcon aria-hidden="true" />Rental</TabsTrigger><TabsTrigger value="buy"><HouseIcon aria-hidden="true" />Buy</TabsTrigger></TabsList>
-      <TabsContent value="rental" forceMount hidden={mode !== 'rental'} className="overview-stack"><Rental source={rent} asking={asking} onAskingChange={setAsking} /><Living amenities={amenities} transport={transport} /></TabsContent>
-      <TabsContent value="buy" className="overview-stack"><Valuation source={valuation} sale={sale} /><ComparableSales source={comparables} /><Planning source={planning} /><EnvironmentalRisks source={risks} /></TabsContent>
-    </Tabs>
-    <Collapsible className="overview-wellbeing"><div className="overview-wellbeing-header"><span className="overview-icon"><HeartPulseIcon aria-hidden="true" /></span><div><h2>Neighbourhood wellbeing</h2><p className="overview-muted">A score is not available from this API.</p><CollapsibleTrigger asChild><Button variant="link" size="sm">About the six indicators<ArrowRightIcon data-icon="inline-end" aria-hidden="true" /></Button></CollapsibleTrigger></div></div><CollapsibleContent><p className="overview-muted mt-3">Transport, recreation, local services, healthcare, noise and greenery can help you understand an area. Available distances appear under Rental. We do not turn missing data into a score.</p></CollapsibleContent></Collapsible>
-    <div className="overview-primary-actions">{onSave && <Button disabled={saving} onClick={() => void save()}>{saving ? <Spinner data-icon="inline-start" /> : <BookmarkIcon data-icon="inline-start" aria-hidden="true" />}Save to notes</Button>}<Button variant="outline" onClick={() => void share()}><Share2Icon data-icon="inline-start" aria-hidden="true" />Share this home</Button></div>
+    <article className="overview-card address-card"><span className="overview-icon"><MapPinIcon aria-hidden="true" /></span><div><p className="overview-confirmed"><CheckIcon aria-hidden="true" />Confirmed address</p><h1>{report.candidate.label}</h1></div><button className="popup-link" onClick={() => setChangeHelp(value => !value)} aria-expanded={changeHelp} aria-controls={`${tabsId}-address-help`}>Change</button>{changeHelp && <p id={`${tabsId}-address-help`} className="overview-muted">Select another address on a webpage, choose Look up property, and confirm the match. Then reopen this popup.</p>}</article>
+    <div className="research-tabs" role="tablist" aria-label="Property research" onKeyDown={event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const value = event.key === 'Home' ? 'rental' : event.key === 'End' ? 'buy' : mode === 'rental' ? 'buy' : 'rental';
+      setMode(value); event.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${value}"]`)?.focus();
+    }}>{[{ value: 'rental', label: 'Rental', icon: KeyRoundIcon }, { value: 'buy', label: 'Buy', icon: HouseIcon }].map(({ value, label, icon: Icon }) => <button key={value} type="button" role="tab" id={`${tabsId}-${value}-tab`} data-mode={value} aria-selected={mode === value} aria-controls={`${tabsId}-${value}`} tabIndex={mode === value ? 0 : -1} onClick={() => setMode(value)}><Icon aria-hidden="true" />{label}</button>)}</div>
+    <div id={`${tabsId}-rental`} role="tabpanel" aria-labelledby={`${tabsId}-rental-tab`} hidden={mode !== 'rental'} className="overview-stack"><Rental source={rent} asking={asking} onAskingChange={setAsking} /><Living amenities={amenities} transport={transport} /></div>
+    <div id={`${tabsId}-buy`} role="tabpanel" aria-labelledby={`${tabsId}-buy-tab`} hidden={mode !== 'buy'} className="overview-stack"><Valuation source={valuation} sale={sale} /><ComparableSales source={comparables} /><Planning source={planning} /><EnvironmentalRisks source={risks} /></div>
+    <Wellbeing source={livability} />
+    <div className="overview-primary-actions">{onSave && <button className="popup-button primary" disabled={saving} onClick={() => void save()}><BookmarkIcon aria-hidden="true" />{saving ? 'Saving…' : 'Save to notes'}</button>}<button className="popup-button" onClick={() => void share()}><Share2Icon aria-hidden="true" />Share this home</button></div>
     <p className="status" role="status" aria-atomic="true">{status}</p>
-    <Card size="sm"><CardHeader><div className="overview-detail-row"><div><CardDescription><span className="overview-eyebrow">More local knowledge</span></CardDescription><CardTitle><h2>Suburb insights & market updates</h2></CardTitle></div><Button asChild variant="outline" size="icon" aria-label="Explore Microburbs"><a href="https://www.microburbs.com.au" target="_blank" rel="noreferrer"><ArrowRightIcon aria-hidden="true" /></a></Button></div></CardHeader></Card>
   </div>;
 }

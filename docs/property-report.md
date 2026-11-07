@@ -5,14 +5,31 @@ Its default Property tab shows the last confirmed match across all browser tabs.
 Notes remain available in a separate tab. Merely highlighting text does not start
 a report; ambiguous searches wait until a matching candidate is chosen.
 
-The popup follows the Rental and Buy reference layouts. Rental shows the latest
-advertised weekly rent, an optional comparison with a manually entered asking
+The popup follows the Rental and Buy reference layouts using native React/HTML
+controls and scoped CSS. The header uses the supplied Microburbs wordmark.
+Rental shows the latest advertised rent, an optional comparison with a manually entered asking
 rent, and nearby transport and amenities. An advertised rent is an observation,
 not a model estimate. Buy shows the automated valuation and its 80% range,
 comparable sales, primary zoning and flood/bushfire overlays. Missing fields are
-shown as unavailable; no wellbeing score, noise rating, greenery measurement or
-development applications are invented. For-sale listings are labelled separately
+shown as unavailable; no noise rating, greenery measurement or development
+applications are invented. For-sale listings are labelled separately
 from sold records.
+
+The rent API does not normalize the observation's period. The popup does not
+label that value as weekly; users must compare amounts for the same period.
+
+The wellbeing card calculates a prototype suburb index from saved
+`/v1/suburbs/{suburb_name}/lifestyle/livability` data. It equally weights the
+`lifestyle`, `convenience`, `family`, `safety` and `tranquility` dimensions, averages
+available finite scores in the 0–100 range and rounds the final average once.
+At least three unique dimensions and a named suburb-level response are required.
+Missing, invalid and duplicated dimensions are excluded; a real zero remains zero.
+The card shows the suburb, coverage and expandable inputs, with an accessible
+native meter. It does not describe an individual home or provide a clinical measure.
+
+The bottom social card links to the official Instagram, YouTube and Facebook
+accounts listed on Microburbs' website. Links open in new tabs; the popup does
+not track follows or promise a reward.
 
 **Save to notes** saves the confirmed address. **Share this home** copies that
 address to the clipboard and reports whether copying succeeded. **Change** explains

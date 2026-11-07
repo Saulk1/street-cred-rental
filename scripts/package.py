@@ -67,6 +67,7 @@ def runtime_files(manifest):
              manifest["background"]["service_worker"], manifest["action"]["default_popup"],
              manifest["options_page"], manifest["side_panel"]["default_path"], "welcome/welcome.html",
              "ui/pages.js", "ui/pages.css", "ui/selection-card.css", "ui/widget.css",
+             "assets/2b3d1c2b0be2d1ac87bf7a95fac33e3a.webp",
              *manifest["icons"].values(),
              *(filename for script in manifest.get("content_scripts", [])
                for kind in ("js", "css") for filename in script.get(kind, []))]

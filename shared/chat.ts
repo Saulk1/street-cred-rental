@@ -1,9 +1,12 @@
+import type { Calculation } from './compute.js';
+
 export type ChatInput = { role: 'user' | 'assistant'; content: string };
 export type ChatSource = { id: string; label: string; path: string };
 export type ChatEvent =
   | { type: 'delta'; text: string }
   | { type: 'tool'; id: string; label: string; status: 'running' | 'done' | 'error' }
   | { type: 'source'; source: ChatSource }
+  | { type: 'calculation'; calculation: Calculation }
   | { type: 'done' }
   | { type: 'error'; code: string; message: string };
 
@@ -12,6 +15,7 @@ export type ChatMessage = ChatInput & {
   id: string;
   state: 'complete' | 'incomplete';
   sources: ChatSource[];
+  calculations?: Calculation[];
 };
 
 export function validHistory(value: unknown): value is ChatInput[] {

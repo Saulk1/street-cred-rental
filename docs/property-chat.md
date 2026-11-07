@@ -6,9 +6,10 @@ The `microburbs/microburbs-facts` Vercel project uses Node.js 22, production
 server environment variables and a published 10-request/60-second per-IP limit
 for `POST /api/chat`.
 
-The extension's options page is now a dedicated property chatbot. The previous
-guide remains on the welcome page and side panel. The popup notepad and existing
-selection lookups are unchanged.
+The extension's options page is a dedicated property chatbot, styled with the
+popup's blue palette, supplied Microburbs logo and rounded surfaces. Its native
+controls retain streaming, saved conversations, keyboard submission and expandable
+calculation details. The previous guide remains on the welcome page and side panel.
 
 ## Configure a private team build
 
@@ -60,6 +61,12 @@ search addresses and retrieve basics, model valuations, risks, sale/rent history
 planning, schools, amenities and transport. It asks for clarification when
 addresses are ambiguous. Retrieved sources appear below each answer and are
 referenced as `[S1]`, `[S2]`, and so on, separately for each answer.
+
+The assistant also supports reviewed Python calculations, starting with a
+comparison of a user-stated weekly rent against the property's latest historical
+rental listing. Expand a `C1 · Rent comparison` row to inspect computed values,
+inputs, units, assumptions and limitations. See [Compute setup](property-compute.md)
+for the two server-only settings and how to add calculation modules.
 
 Enter sends a message; Shift+Enter inserts a newline. IME composition does not
 send a message. Stop cancels the current request. Interrupted or failed replies

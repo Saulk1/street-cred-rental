@@ -5,6 +5,10 @@
   "buildCommand": "npm run typecheck:server",
   "outputDirectory": "server/public",
   "functions": {
+    "api/compute.py": {
+      "maxDuration": 10,
+      "excludeFiles": "{node_modules/**,tests/**,assets/**,dist/**,src/**,.build/**,.tools/**}"
+    },
     "api/chat.ts": {
       "maxDuration": 60
     },

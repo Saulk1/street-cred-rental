@@ -54,8 +54,3 @@ which builds the UI first. `npm run build` compiles self-contained page/content
 IIFEs to ignored `.build/` storage; the Python runtime allowlist includes only
 compiled assets, controllers and required extension resources. Keep `.tools/`,
 node_modules, source, agent instructions and all development files out of the ZIP.
-
-Shared UI CSS belongs inside extension pages or shadow roots only. Manifest CSS
-must style only the two injected host IDs. Do not inject Tailwind's global reset
-into webpages, introduce remote runtime assets, or weaken the CSP.
-

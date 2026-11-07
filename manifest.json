@@ -22,7 +22,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["ui/widget.css", "ui/selection-card.css"],
+      "resources": ["ui/widget.css", "ui/selection-card.css", "assets/2b3d1c2b0be2d1ac87bf7a95fac33e3a.webp"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ],

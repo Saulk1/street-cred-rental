@@ -23,9 +23,9 @@ beforeEach(() => {
 async function details() {
   const user = userEvent.setup(); render(<PropertyReport />);
   await screen.findByRole('heading', { name: '26 Example St' });
-  await user.click(screen.getByRole('button', { name: 'Sources & full property report' }));
-  await user.click(screen.getByRole('button', { name: /Property · basics/ }));
-  await user.click(screen.getByRole('button', { name: /All basics/ }));
+  await user.click(screen.getByText('Sources & full property report').closest('summary')!);
+  await user.click(screen.getByText(/Property · basics/).closest('summary')!);
+  await user.click(screen.getByText('All basics').closest('summary')!);
   return user;
 }
 
@@ -33,10 +33,10 @@ it('restores the confirmed address and reads payloads only when their disclosure
   render(<PropertyReport />);
   await screen.findByRole('heading', { name: '26 Example St' });
   expect(send.mock.calls.some(([message]) => message.type === 'REPORT_RESULT')).toBe(false);
-  fireEvent.click(screen.getByRole('button', { name: 'Sources & full property report' }));
-  expect(screen.getByText(/1 of 1 requests processed/)).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: /Property · basics/ }));
-  fireEvent.click(screen.getByRole('button', { name: /All basics/ }));
+  fireEvent.click(screen.getByText('Sources & full property report').closest('summary')!);
+  expect(await screen.findByText(/1 of 1 requests processed/)).toBeVisible();
+  fireEvent.click((await screen.findByText(/Property · basics/)).closest('summary')!);
+  fireEvent.click((await screen.findByText('All basics')).closest('summary')!);
   expect(await screen.findByText('house')).toBeVisible();
   expect(screen.getByText('0')).toBeVisible();
   expect(screen.getAllByText('Not available').some(node => node.tagName === 'DD')).toBe(true);
@@ -45,7 +45,7 @@ it('restores the confirmed address and reads payloads only when their disclosure
 it('renders complete envelopes as literal JSON, with a download action', async () => {
   const user = await details();
   await screen.findByText('house');
-  await user.click(screen.getByRole('button', { name: 'Full response' }));
+  await user.click(screen.getByText('Full response').closest('summary')!);
   expect(screen.getByLabelText('Full API response')).toHaveTextContent('"available": true');
   expect(screen.getByRole('button', { name: 'Download JSON' })).toBeVisible();
 });
@@ -81,8 +81,8 @@ it('shows an actionable empty state and follows newer confirmed selections', asy
 it('refreshes by report id and removes subscriptions when the popup closes', async () => {
   const view = render(<PropertyReport />);
   await screen.findByRole('heading', { name: '26 Example St' });
-  fireEvent.click(screen.getByRole('button', { name: 'Sources & full property report' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Refresh report' }));
+  fireEvent.click(screen.getByText('Sources & full property report').closest('summary')!);
+  fireEvent.click(await screen.findByRole('button', { name: 'Refresh report' }));
   await waitFor(() => expect(send).toHaveBeenCalledWith({ type: 'REPORT_REFRESH', reportId: 'report-1' }));
   view.unmount(); expect(changes).toHaveLength(0);
 });

@@ -1,16 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUpIcon, CheckIcon, MapPinIcon, PlusIcon, RotateCcwIcon, SquareIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group';
-import { Bubble, BubbleContent } from '@/components/ui/bubble';
-import { Message, MessageContent, MessageHeader, MessageFooter } from '@/components/ui/message';
-import { MessageScrollerProvider, MessageScroller, MessageScrollerViewport, MessageScrollerContent, MessageScrollerItem, MessageScrollerButton } from '@/components/ui/message-scroller';
-import { Trace, TraceLine, TraceIcon, TraceTitle } from '@/components/ui/trace';
-import { Spinner } from '@/components/ui/spinner';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, MapPinIcon, PlusIcon, RotateCcwIcon, SquareIcon } from 'lucide-react';
+import { FactsBrand } from '@/components/facts-brand';
 import { chatConfiguration, readThread, receiveChat } from '@/lib/chat';
+import { CalculationTrace } from '@/components/calculation-trace';
 import { CHAT_KEY, type ChatEvent, type ChatMessage } from '../shared/chat';
 
 type Activity = Extract<ChatEvent, { type: 'tool' }>;
@@ -31,7 +23,14 @@ export function PropertyChat() {
   const queue = useRef(Promise.resolve());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editor = useRef<HTMLTextAreaElement>(null);
+  const thread = useRef<HTMLDivElement>(null);
+  const follow = useRef(true);
+  const [showLatest, setShowLatest] = useState(false);
   const available = !!chatConfiguration();
+
+  useLayoutEffect(() => {
+    if (follow.current && thread.current) thread.current.scrollTop = messages.length ? thread.current.scrollHeight : 0;
+  }, [messages, activity, loaded, busy]);
 
   function persist(next: ChatMessage[], remove = false) {
     const snapshot = structuredClone(next);
@@ -68,10 +67,11 @@ export function PropertyChat() {
 
   async function send(retry = false) {
     if (request.current || !loaded || !available || (!retry && !draft.trim())) return;
+    follow.current = true; setShowLatest(false);
     const prefix = retry ? current.current.slice(0, -1) : [...current.current,
       { id: crypto.randomUUID(), role: 'user' as const, content: draft.trim(), state: 'complete' as const, sources: [] }];
     if (prefix.at(-1)?.role !== 'user') return;
-    const assistant: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: '', state: 'incomplete', sources: [] };
+    const assistant: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: '', state: 'incomplete', sources: [], calculations: [] };
     update([...prefix, assistant].slice(-80), true);
     if (!retry) setDraft('');
     setError(''); setActivity([]); setBusy(true);
@@ -88,8 +88,9 @@ export function PropertyChat() {
         }
         if (event.type === 'delta') assistant.content += event.text;
         if (event.type === 'source') assistant.sources.push(event.source);
+        if (event.type === 'calculation') assistant.calculations!.push(event.calculation);
         if (event.type === 'done') assistant.state = 'complete';
-        update(current.current.map(m => m.id === assistant.id ? { ...assistant, sources: [...assistant.sources] } : m), event.type === 'done');
+        update(current.current.map(m => m.id === assistant.id ? { ...assistant, sources: [...assistant.sources], calculations: [...assistant.calculations!] } : m), event.type === 'done');
       });
     } catch (cause) {
       if (active() && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chat could not be reached. Please retry.');
@@ -105,41 +106,33 @@ export function PropertyChat() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     current.current = []; hydrated.current = true; setMessages([]); persist([], true);
     setDraft(''); setError(''); setStorageError(''); setBusy(false); setActivity([]); editor.current?.focus();
+    follow.current = true; setShowLatest(false);
   }
   const retry = messages.at(-1)?.role === 'assistant' && messages.at(-1)?.state === 'incomplete';
 
   return <main className="chat-shell">
-    <header className="chat-header"><div><p className="eyebrow">MICROBURBS FACTS</p><h1>Property assistant</h1></div>
-      <Button variant="outline" disabled={!loaded} onClick={newChat}><PlusIcon data-icon="inline-start" aria-hidden="true" />New chat</Button></header>
-    {!available && <Alert><AlertTitle>Chat is unavailable in this build</AlertTitle><AlertDescription>Your team needs to configure and rebuild the private extension to enable chat.</AlertDescription></Alert>}
-    {storageError && <Alert variant="destructive"><AlertTitle>Chat storage</AlertTitle><AlertDescription>{storageError}</AlertDescription></Alert>}
-    <section className="chat-thread" aria-label="Conversation" aria-busy={!loaded}>
-      <MessageScrollerProvider autoScroll defaultScrollPosition="end"><MessageScroller>
-        <MessageScrollerViewport><MessageScrollerContent className="p-4">
-          {!messages.length && <MessageScrollerItem messageId="empty"><Empty><EmptyHeader><EmptyMedia variant="icon"><MapPinIcon aria-hidden="true" /></EmptyMedia><EmptyTitle>{loaded ? 'What would you like to know?' : 'Loading your conversation…'}</EmptyTitle><EmptyDescription>Ask about an address in the City of Sydney. Explore property facts, estimates and the neighbourhood.</EmptyDescription></EmptyHeader></Empty></MessageScrollerItem>}
-          {messages.map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.role === 'user'}>
-            <Message align={message.role === 'user' ? 'end' : 'start'}><MessageContent>
-              <MessageHeader>{message.role === 'user' ? 'You' : 'Microburbs'}</MessageHeader>
-              {message.content && <Bubble variant={message.role === 'user' ? 'default' : 'secondary'} align={message.role === 'user' ? 'end' : 'start'}><BubbleContent><p className="whitespace-pre-wrap wrap-anywhere">{message.content}</p></BubbleContent></Bubble>}
-              {message.id === messages.at(-1)?.id && busy && <Trace aria-label="Assistant activity">{activity.length ? activity.map(item => <TraceLine key={item.id} status={item.status === 'done' ? undefined : item.status}><TraceIcon>{item.status === 'running' ? <Spinner /> : <CheckIcon />}</TraceIcon><TraceTitle>{item.label}{item.status === 'done' ? ' · complete' : item.status === 'error' ? ' · unavailable' : '…'}</TraceTitle></TraceLine>) : <TraceLine status="running"><TraceIcon><Spinner /></TraceIcon><TraceTitle>Working on your answer…</TraceTitle></TraceLine>}</Trace>}
-              {!!message.sources.length && <Trace aria-label="Property sources">{message.sources.map(s => <TraceLine key={s.id}><TraceIcon><MapPinIcon /></TraceIcon><TraceTitle>{s.id} · {s.label}</TraceTitle></TraceLine>)}</Trace>}
-              {message.role === 'assistant' && message.state === 'incomplete' && !(busy && message.id === messages.at(-1)?.id) && <MessageFooter>Incomplete answer</MessageFooter>}
-            </MessageContent></Message>
-          </MessageScrollerItem>)}
-        </MessageScrollerContent></MessageScrollerViewport><MessageScrollerButton />
-      </MessageScroller></MessageScrollerProvider>
+    <header className="chat-header"><div><FactsBrand /><p className="chat-tagline">A little local knowledge.</p></div><button className="popup-button" disabled={!loaded} onClick={newChat}><PlusIcon aria-hidden="true" />New chat</button></header>
+    <section className="chat-intro"><div><p className="overview-eyebrow">Your property companion</p><h1>Property assistant</h1><p>From an address to a clearer local picture.</p></div><span className="chat-coverage"><MapPinIcon aria-hidden="true" />City of Sydney</span></section>
+    {!available && <aside className="chat-notice"><h2>Chat is unavailable in this build</h2><p>Your team needs to configure and rebuild the private extension to enable chat.</p></aside>}
+    {storageError && <aside className="chat-notice error" role="alert"><h2>Chat storage</h2><p>{storageError}</p></aside>}
+    <section className="chat-card" aria-label="Conversation" aria-busy={!loaded}><header className="chat-card-heading"><h2>Your conversation</h2><span>Property facts · Local context</span></header>
+      <div ref={thread} className="chat-thread" role="region" tabIndex={0} aria-label="Conversation messages" onScroll={event => { const el = event.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64; setShowLatest(messages.length > 0 && !follow.current); }}>
+        {!messages.length && <div className="chat-empty"><span className="chat-empty-icon"><MapPinIcon aria-hidden="true" /></span><h3>{loaded ? 'What would you like to know?' : 'Loading your conversation…'}</h3><p>Ask about an address in the City of Sydney. Explore property facts, estimates and the neighbourhood.</p><div className="chat-topics"><span>Property facts</span><span>Prices &amp; history</span><span>Neighbourhood</span></div></div>}
+        <ol className="chat-messages">{messages.map(message => <li key={message.id} className="chat-message" data-author={message.role}><article><header>{message.role === 'user' ? 'You' : 'Microburbs'}</header>
+          {message.content && <p className="chat-message-text">{message.content}</p>}
+          {message.id === messages.at(-1)?.id && busy && <ul className="chat-activity" aria-label="Assistant activity">{activity.length ? activity.map(item => <li key={item.id} data-state={item.status}>{item.status === 'running' ? <span className="native-spinner" aria-hidden="true" /> : <CheckIcon aria-hidden="true" />}<span>{item.label}{item.status === 'done' ? ' · complete' : item.status === 'error' ? ' · unavailable' : '…'}</span></li>) : <li><span className="native-spinner" aria-hidden="true" /><span>Working on your answer…</span></li>}</ul>}
+          {!!message.sources.length && <ul className="chat-sources" aria-label="Property sources">{message.sources.map(source => <li key={source.id}><MapPinIcon aria-hidden="true" /><span>{source.id} · {source.label}</span></li>)}</ul>}
+          {!!message.calculations?.length && <CalculationTrace calculations={message.calculations} />}
+          {message.role === 'assistant' && message.state === 'incomplete' && !(busy && message.id === messages.at(-1)?.id) && <footer>Incomplete answer</footer>}
+        </article></li>)}</ol>
+      </div>
+      {showLatest && <button className="chat-jump" onClick={() => { follow.current = true; setShowLatest(false); if (thread.current) thread.current.scrollTop = thread.current.scrollHeight; }}><ArrowDownIcon aria-hidden="true" />Latest messages</button>}
     </section>
     <div role="status" aria-live="polite" className="chat-status">{busy ? 'Generating an answer.' : error || (retry ? 'Answer interrupted. You can retry or ask another question.' : '')}</div>
-    {retry && !busy && <Button className="self-start" variant="outline" disabled={!available} onClick={() => void send(true)}><RotateCcwIcon data-icon="inline-start" />Retry answer</Button>}
-    <form onSubmit={e => { e.preventDefault(); void send(); }}><FieldGroup><Field>
-      <FieldLabel htmlFor="chat-message" className="sr-only">Message</FieldLabel>
-      <InputGroup><InputGroupTextarea ref={editor} id="chat-message" name="message" maxLength={4000} rows={3} placeholder="Ask about a property…" value={draft} disabled={!loaded || !available} aria-describedby="chat-privacy" onChange={e => setDraft(e.target.value)} onKeyDown={e => {
-        if (e.key === 'Enter' && !e.shiftKey) { if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return; e.preventDefault(); e.currentTarget.form?.requestSubmit(); }
-      }} /><InputGroupAddon align="block-end" className="justify-between"><span className="text-xs">Shift + Enter for a new line</span>
-        {busy ? <InputGroupButton size="sm" variant="outline" onClick={() => request.current?.abort()}><SquareIcon data-icon="inline-start" />Stop</InputGroupButton>
-          : <InputGroupButton size="sm" variant="default" type="submit" disabled={!loaded || !available || !draft.trim()}><ArrowUpIcon data-icon="inline-start" />Send</InputGroupButton>}
-      </InputGroupAddon></InputGroup>
-    </Field></FieldGroup></form>
+    {retry && !busy && <button className="popup-button chat-retry" disabled={!available} onClick={() => void send(true)}><RotateCcwIcon aria-hidden="true" />Retry answer</button>}
+    <form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(); }}><label htmlFor="chat-message" className="popup-sr-only">Message</label><textarea ref={editor} id="chat-message" name="message" maxLength={4000} rows={3} placeholder="Ask about a property…" value={draft} disabled={!loaded || !available} aria-describedby="chat-privacy chat-keyboard-hint" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
+      if (event.key === 'Enter' && !event.shiftKey) { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
+    }} /><footer><span id="chat-keyboard-hint">Shift + Enter for a new line</span>{busy ? <button type="button" className="popup-button" onClick={() => request.current?.abort()}><SquareIcon aria-hidden="true" />Stop</button> : <button className="popup-button primary" type="submit" disabled={!loaded || !available || !draft.trim()}><ArrowUpIcon aria-hidden="true" />Send</button>}</footer></form>
     <p id="chat-privacy" className="chat-privacy">Messages and requested property data are sent to your team’s backend and OpenAI. This chat is saved in this Chrome profile. Valuations are estimates.</p>
   </main>;
 }

@@ -2,14 +2,119 @@
 
 **Beta extension for the Microburbs Hackathon 2026, built by team Street Cred.**
 
-A Manifest V3 Chrome extension with a React, TypeScript and shadcn/ui interface.
-Version 0.1.0 opens a toolbar popup with property reports, a local notepad and buttons for the options
-page, side panel and page widget. The options page is a property chatbot; the side panel provides a usage guide,
-and requests the `sidePanel`, `storage` and `contextMenus` API permissions.
-A content script waits for **Show page widget** before
-adding a dismissible widget to an ordinary HTTP or HTTPS page; its manifest match
-patterns request access to those sites.
-Selecting regular page text reveals a card with **Save to notes** and **Look up property**.
+Research a home while browsing its listing. Highlight an address, confirm the
+match, explore Rental and Buy views, and ask a property assistant follow-up
+questions backed by Microburbs data and inspectable Python calculations.
+
+## What we built
+
+Microburbs Facts is a Chrome extension with three connected tools:
+
+- **Property research:** an on-page address lookup and a toolbar popup with
+  rental history, automated valuations, comparable sales, amenities, zoning,
+  environmental overlays and a suburb wellbeing index. A full report loads in
+  the background and keeps its results when the popup closes.
+- **Property assistant:** an options-page chatbot that retrieves property data,
+  asks for missing information and streams answers with source references.
+  Its Python compute layer starts with a rent comparison: weekly and annual
+  differences and the percentage change from a historical asking rent.
+- **Local notes:** save selected page text, property summaries or your own notes
+  in the current Chrome profile.
+
+The extension uses React and TypeScript. A Node.js backend coordinates the
+chatbot's Microburbs lookups; a separate authenticated Python function runs
+registered calculation modules.
+
+## Who it helps
+
+**Renters** can compare an asking amount with a historical listing and explore
+transport, shops and other everyday amenities. **Home buyers** can inspect
+valuation estimates, nearby sales, zoning and mapped environmental context.
+Both can keep their research together and ask follow-up questions without
+manually combining API responses or doing the arithmetic themselves.
+
+Current property-data coverage is the **City of Sydney LGA**. Valuations are
+estimates, historical listings are dated observations, and overlays provide
+context rather than a planning certificate.
+
+## The data
+
+- **Microburbs Hackathon API:** address matching, property facts, valuations,
+  sale and rental history, comparables, planning, schools, amenities, transport,
+  overlays and suburb/regional datasets. Missing values remain distinguishable
+  from zero and from failed requests.
+- **User responses:** explicit scenario inputs, such as the proposed weekly rent
+  and the period used by a historical rental listing. The API does not specify
+  that listing's rent period, so the assistant must ask rather than assume.
+- **Derived results:** the popup averages available lifestyle, convenience,
+  family, safety and tranquility scores, requiring at least three of the five.
+  Python calculates rent comparisons from verified API inputs and user-stated
+  parameters, with units and assumptions attached.
+
+Notes, saved reports and the conversation stay in the Chrome profile. Chat
+messages and requested property data also travel to the backend and OpenAI;
+only the required calculation inputs go to Python. The CSV resources under
+`assets/` and the optional Neon database are separate from the current chatbot's
+data flow.
+
+## The clever step
+
+**The chatbot gathers and explains; Python does the calculation.** The model
+selects a named calculator, while the server fetches its required API data and
+checks user parameters against exact quotes from user messages. It passes a
+structured payload to a checked-in Python module, then returns an expandable
+calculation record containing the result, inputs, sources, units, assumptions
+and calculator version.
+
+That makes the arithmetic inspectable and repeatable. It also catches a subtle
+data problem: a historical rent amount cannot be compared with a weekly proposal
+until its period is known. The calculator asks for that information and converts
+weekly, fortnightly, monthly or yearly amounts consistently. New calculators
+join the same registry through a declared input/output contract.
+
+## How to run it
+
+Use **Node.js 22.12+ within the 22.x release**, **Python 3.12** and desktop Chrome.
+
+1. Create a root `.env.local` with your team's `MICROBURBS_API_BASE_URL` and
+   `MICROBURBS_API_KEY`. Preserve any existing settings.
+2. Install dependencies and package the extension:
+
+   ```sh
+   npm ci
+   python3 scripts/package.py
+   ```
+
+3. Open `chrome://extensions`, enable **Developer mode**, select **Load
+   unpacked**, and choose `dist/unpacked/`. Pin Microburbs Facts.
+4. On a webpage, select a full City of Sydney address and choose **Look up
+   property**. Confirm the match, then open the toolbar popup for Rental and Buy
+   views. Open **Options** for the property assistant.
+
+To enable chat, deploy the backend with the server settings in
+[Chat setup](docs/property-chat.md), then set `DATA_API_BASE_URL` to its HTTPS
+origin and `CHAT_ACCESS_TOKEN` in the extension's `.env.local`. Python
+calculations additionally need these **server-only** settings:
+
+| Setting | Purpose |
+| --- | --- |
+| `COMPUTE_API_URL` | Exact HTTPS URL of the deployed `/api/compute` function |
+| `COMPUTE_SERVICE_TOKEN` | A separate random token of at least 32 characters, shared by the Node and Python functions |
+
+Rebuild with `python3 scripts/package.py`, reload the extension, and refresh
+already-open webpages after changing source or extension settings. Provider
+keys and compute credentials stay on the backend; local authenticated extension
+builds contain inspectable team credentials and should remain private.
+
+For backend development, use `npm run dev:api` and `npm run dev:compute` in
+separate terminals, with `COMPUTE_API_URL=http://127.0.0.1:3001/api/compute` in
+local settings. These local commands test the backend; the installed extension
+requires an HTTPS chat origin. See [Compute setup](docs/property-compute.md) for
+the calculation contract and how to add Python modules.
+
+Run `npm run test:compute`, `npm run test:server`, `npm run test:ui`,
+`npm run typecheck` and `npm run typecheck:server` for the Python, backend and
+chat UI checks. Core tests use fixtures; database integration checks are opt-in.
 
 ## Microburbs Hackathon 2026
 
@@ -39,9 +144,8 @@ Released under the [MIT License](LICENSE). Copyright © 2026 Street Cred contrib
 
 ### Optional Neon data API
 
-The repository includes a separate Vercel/Drizzle backend. The 9,143 records from
-`assets/example.csv` are imported into Neon's `energy_reports` table with a typed
-Drizzle schema. `GET /api/health` checks Neon connectivity. See
+The repository includes an optional Neon/Drizzle database layer with a typed
+`energy_reports` schema. `GET /api/health` checks Neon connectivity. See
 [Data API setup](docs/data-api.md) for database roles, environment configuration,
 local development, deployment, migrations and import verification. Dataset query
 endpoints and extension data views are deferred.
@@ -131,12 +235,19 @@ Use **Open options** in the popup to open or focus the options tab. You can also
 right-click the extension's toolbar icon and choose **Options**. The page opens the property assistant, with streaming answers, Microburbs lookups and one locally saved conversation. See [Chat setup](docs/property-chat.md) to configure the private team build. Use **Open side panel** to open the guide in
 the current browser window (Chrome 116 or newer).
 
+The property assistant also supports a server-side Python compute layer. Its
+first calculator compares a proposed weekly rent with the latest historical
+listing amount, after the user confirms that listing's rent period. Results
+include inspectable inputs, source references, units and assumptions. See
+[Compute setup and adding calculators](docs/property-compute.md).
+
 ### Full property report
 
-After confirming an address in the selection card, open the toolbar popup's
-**Property** tab for the Rental and Buy views. Rental shows the latest advertised
+After confirming an address in the selection card, open the toolbar popup
+for the Rental and Buy views. Rental shows the latest advertised
 rent and nearby everyday amenities; Buy shows the valuation, comparable sales,
-zoning and environmental overlays. **Sources & full property report** opens the
+zoning and environmental overlays. Both views include a calculated suburb
+wellbeing index with its five inputs and data coverage. **Sources & full property report** opens the
 complete Microburbs report. All applicable property,
 suburb and regional datasets load progressively, including histories, geographic
 layers and area statistics. Reopening the popup restores progress and saved
@@ -162,6 +273,10 @@ show a **Save to notes** card beside the selection. Click it to save the selecte
 text, then open the toolbar popup to view or delete the note. The card confirms
 success and blocks repeated saves until you make a new selection. If saving
 fails, it offers a retry with the same captured text.
+
+The selection card uses the popup's Microburbs logo, blue actions and rounded
+white result cards. Property details and additional sections expand inside its
+scrollable surface.
 
 The card does not move focus when it appears. Press **Tab** to focus its Save
 button and **Enter** or **Space** to activate it. **Escape**, clicking outside,

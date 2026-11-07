@@ -1,0 +1,3611 @@
+{
+  "generated_at": "2026-11-07T04:09:57.534759+00:00",
+  "git_head": "946f29d",
+  "seed": 202611071507,
+  "kind": "Post-implementation synthetic challenge; not a blind market-data holdout.",
+  "source_sha256": {
+    "compute/catalog.json": "cadd47f74e21f7484e1bfe9d940d2e9891af5f940b53bf4abf336348becbb261",
+    "compute/registry.py": "ca1bed6327d047decb218f71c171cd5bc1d9aa91e7d10291222a1c8a016d4c6f",
+    "compute/calculators/rent_comparison.py": "3ea2047ba0c21540700789247ca2971b97f38b4fde4599f9c6cace9dc40abc85",
+    "server/compute.ts": "269d6d6c22bd71b3feb3c99df0d29baacef088badf45be93c445b4bfcf451358",
+    "src/lib/wellbeing.ts": "554c83a3776865125634a9993055d0f922367f62da0f3714181e7dd7c81025b9"
+  },
+  "application_sources_unchanged": true,
+  "oracle": "Independent exact rational arithmetic, annualize first, integer half-up rounding to 2 decimals; no production calculator or Decimal used by oracle.",
+  "metric_order": [
+    "reference_weekly_rent",
+    "weekly_difference",
+    "annual_difference",
+    "difference_percent"
+  ],
+  "counts": {
+    "rent_arithmetic": {
+      "passed": 165,
+      "total": 165
+    },
+    "input_guards": {
+      "passed": 16,
+      "total": 16
+    },
+    "wellbeing": {
+      "passed": 8,
+      "total": 8
+    },
+    "semantic_evidence": {
+      "passed": 0,
+      "total": 1
+    }
+  },
+  "groups": {
+    "rent_arithmetic": [
+      {
+        "id": 1,
+        "proposed_weekly_aud": 694.23,
+        "historical_amount_aud": 2845.37,
+        "historical_period": "month",
+        "expected": [
+          656.62,
+          37.61,
+          1955.52,
+          5.73
+        ],
+        "actual": [
+          656.62,
+          37.61,
+          1955.52,
+          5.73
+        ],
+        "passed": true
+      },
+      {
+        "id": 2,
+        "proposed_weekly_aud": 487.65,
+        "historical_amount_aud": 1260.79,
+        "historical_period": "fortnight",
+        "expected": [
+          630.4,
+          -142.75,
+          -7422.74,
+          -22.64
+        ],
+        "actual": [
+          630.4,
+          -142.75,
+          -7422.74,
+          -22.64
+        ],
+        "passed": true
+      },
+      {
+        "id": 3,
+        "proposed_weekly_aud": 831.04,
+        "historical_amount_aud": 42187.63,
+        "historical_period": "year",
+        "expected": [
+          811.3,
+          19.74,
+          1026.45,
+          2.43
+        ],
+        "actual": [
+          811.3,
+          19.74,
+          1026.45,
+          2.43
+        ],
+        "passed": true
+      },
+      {
+        "id": 4,
+        "proposed_weekly_aud": 0.0,
+        "historical_amount_aud": 913.27,
+        "historical_period": "week",
+        "expected": [
+          913.27,
+          -913.27,
+          -47490.04,
+          -100.0
+        ],
+        "actual": [
+          913.27,
+          -913.27,
+          -47490.04,
+          -100.0
+        ],
+        "passed": true
+      },
+      {
+        "id": 5,
+        "proposed_weekly_aud": 0.0,
+        "historical_amount_aud": 0.26,
+        "historical_period": "year",
+        "expected": [
+          0.01,
+          -0.01,
+          -0.26,
+          -100.0
+        ],
+        "actual": [
+          0.01,
+          -0.01,
+          -0.26,
+          -100.0
+        ],
+        "passed": true
+      },
+      {
+        "id": 6,
+        "proposed_weekly_aud": 1707.52,
+        "historical_amount_aud": 48124.41,
+        "historical_period": "week",
+        "expected": [
+          48124.41,
+          -46416.89,
+          -2413678.28,
+          -96.45
+        ],
+        "actual": [
+          48124.41,
+          -46416.89,
+          -2413678.28,
+          -96.45
+        ],
+        "passed": true
+      },
+      {
+        "id": 7,
+        "proposed_weekly_aud": 1882.53,
+        "historical_amount_aud": 21962.99,
+        "historical_period": "week",
+        "expected": [
+          21962.99,
+          -20080.46,
+          -1044183.92,
+          -91.43
+        ],
+        "actual": [
+          21962.99,
+          -20080.46,
+          -1044183.92,
+          -91.43
+        ],
+        "passed": true
+      },
+      {
+        "id": 8,
+        "proposed_weekly_aud": 1760.38,
+        "historical_amount_aud": 13026.34,
+        "historical_period": "week",
+        "expected": [
+          13026.34,
+          -11265.96,
+          -585829.92,
+          -86.49
+        ],
+        "actual": [
+          13026.34,
+          -11265.96,
+          -585829.92,
+          -86.49
+        ],
+        "passed": true
+      },
+      {
+        "id": 9,
+        "proposed_weekly_aud": 1903.22,
+        "historical_amount_aud": 9401.32,
+        "historical_period": "week",
+        "expected": [
+          9401.32,
+          -7498.1,
+          -389901.2,
+          -79.76
+        ],
+        "actual": [
+          9401.32,
+          -7498.1,
+          -389901.2,
+          -79.76
+        ],
+        "passed": true
+      },
+      {
+        "id": 10,
+        "proposed_weekly_aud": 2145.51,
+        "historical_amount_aud": 21769.35,
+        "historical_period": "week",
+        "expected": [
+          21769.35,
+          -19623.84,
+          -1020439.68,
+          -90.14
+        ],
+        "actual": [
+          21769.35,
+          -19623.84,
+          -1020439.68,
+          -90.14
+        ],
+        "passed": true
+      },
+      {
+        "id": 11,
+        "proposed_weekly_aud": 2223.7,
+        "historical_amount_aud": 26448.43,
+        "historical_period": "week",
+        "expected": [
+          26448.43,
+          -24224.73,
+          -1259685.96,
+          -91.59
+        ],
+        "actual": [
+          26448.43,
+          -24224.73,
+          -1259685.96,
+          -91.59
+        ],
+        "passed": true
+      },
+      {
+        "id": 12,
+        "proposed_weekly_aud": 636.66,
+        "historical_amount_aud": 31565.18,
+        "historical_period": "week",
+        "expected": [
+          31565.18,
+          -30928.52,
+          -1608283.04,
+          -97.98
+        ],
+        "actual": [
+          31565.18,
+          -30928.52,
+          -1608283.04,
+          -97.98
+        ],
+        "passed": true
+      },
+      {
+        "id": 13,
+        "proposed_weekly_aud": 1568.21,
+        "historical_amount_aud": 27048.27,
+        "historical_period": "week",
+        "expected": [
+          27048.27,
+          -25480.06,
+          -1324963.12,
+          -94.2
+        ],
+        "actual": [
+          27048.27,
+          -25480.06,
+          -1324963.12,
+          -94.2
+        ],
+        "passed": true
+      },
+      {
+        "id": 14,
+        "proposed_weekly_aud": 1091.83,
+        "historical_amount_aud": 48469.14,
+        "historical_period": "week",
+        "expected": [
+          48469.14,
+          -47377.31,
+          -2463620.12,
+          -97.75
+        ],
+        "actual": [
+          48469.14,
+          -47377.31,
+          -2463620.12,
+          -97.75
+        ],
+        "passed": true
+      },
+      {
+        "id": 15,
+        "proposed_weekly_aud": 1384.52,
+        "historical_amount_aud": 6051.4,
+        "historical_period": "week",
+        "expected": [
+          6051.4,
+          -4666.88,
+          -242677.76,
+          -77.12
+        ],
+        "actual": [
+          6051.4,
+          -4666.88,
+          -242677.76,
+          -77.12
+        ],
+        "passed": true
+      },
+      {
+        "id": 16,
+        "proposed_weekly_aud": 2185.08,
+        "historical_amount_aud": 21130.37,
+        "historical_period": "week",
+        "expected": [
+          21130.37,
+          -18945.29,
+          -985155.08,
+          -89.66
+        ],
+        "actual": [
+          21130.37,
+          -18945.29,
+          -985155.08,
+          -89.66
+        ],
+        "passed": true
+      },
+      {
+        "id": 17,
+        "proposed_weekly_aud": 588.34,
+        "historical_amount_aud": 2661.99,
+        "historical_period": "week",
+        "expected": [
+          2661.99,
+          -2073.65,
+          -107829.8,
+          -77.9
+        ],
+        "actual": [
+          2661.99,
+          -2073.65,
+          -107829.8,
+          -77.9
+        ],
+        "passed": true
+      },
+      {
+        "id": 18,
+        "proposed_weekly_aud": 1069.29,
+        "historical_amount_aud": 5164.93,
+        "historical_period": "week",
+        "expected": [
+          5164.93,
+          -4095.64,
+          -212973.28,
+          -79.3
+        ],
+        "actual": [
+          5164.93,
+          -4095.64,
+          -212973.28,
+          -79.3
+        ],
+        "passed": true
+      },
+      {
+        "id": 19,
+        "proposed_weekly_aud": 279.25,
+        "historical_amount_aud": 27512.3,
+        "historical_period": "week",
+        "expected": [
+          27512.3,
+          -27233.05,
+          -1416118.6,
+          -98.98
+        ],
+        "actual": [
+          27512.3,
+          -27233.05,
+          -1416118.6,
+          -98.98
+        ],
+        "passed": true
+      },
+      {
+        "id": 20,
+        "proposed_weekly_aud": 1491.53,
+        "historical_amount_aud": 45144.41,
+        "historical_period": "week",
+        "expected": [
+          45144.41,
+          -43652.88,
+          -2269949.76,
+          -96.7
+        ],
+        "actual": [
+          45144.41,
+          -43652.88,
+          -2269949.76,
+          -96.7
+        ],
+        "passed": true
+      },
+      {
+        "id": 21,
+        "proposed_weekly_aud": 371.57,
+        "historical_amount_aud": 57268.67,
+        "historical_period": "week",
+        "expected": [
+          57268.67,
+          -56897.1,
+          -2958649.2,
+          -99.35
+        ],
+        "actual": [
+          57268.67,
+          -56897.1,
+          -2958649.2,
+          -99.35
+        ],
+        "passed": true
+      },
+      {
+        "id": 22,
+        "proposed_weekly_aud": 2104.65,
+        "historical_amount_aud": 6635.61,
+        "historical_period": "week",
+        "expected": [
+          6635.61,
+          -4530.96,
+          -235609.92,
+          -68.28
+        ],
+        "actual": [
+          6635.61,
+          -4530.96,
+          -235609.92,
+          -68.28
+        ],
+        "passed": true
+      },
+      {
+        "id": 23,
+        "proposed_weekly_aud": 943.96,
+        "historical_amount_aud": 59066.29,
+        "historical_period": "week",
+        "expected": [
+          59066.29,
+          -58122.33,
+          -3022361.16,
+          -98.4
+        ],
+        "actual": [
+          59066.29,
+          -58122.33,
+          -3022361.16,
+          -98.4
+        ],
+        "passed": true
+      },
+      {
+        "id": 24,
+        "proposed_weekly_aud": 2003.74,
+        "historical_amount_aud": 42028.71,
+        "historical_period": "week",
+        "expected": [
+          42028.71,
+          -40024.97,
+          -2081298.44,
+          -95.23
+        ],
+        "actual": [
+          42028.71,
+          -40024.97,
+          -2081298.44,
+          -95.23
+        ],
+        "passed": true
+      },
+      {
+        "id": 25,
+        "proposed_weekly_aud": 1444.8,
+        "historical_amount_aud": 4596.04,
+        "historical_period": "week",
+        "expected": [
+          4596.04,
+          -3151.24,
+          -163864.48,
+          -68.56
+        ],
+        "actual": [
+          4596.04,
+          -3151.24,
+          -163864.48,
+          -68.56
+        ],
+        "passed": true
+      },
+      {
+        "id": 26,
+        "proposed_weekly_aud": 627.9,
+        "historical_amount_aud": 45119.8,
+        "historical_period": "week",
+        "expected": [
+          45119.8,
+          -44491.9,
+          -2313578.8,
+          -98.61
+        ],
+        "actual": [
+          45119.8,
+          -44491.9,
+          -2313578.8,
+          -98.61
+        ],
+        "passed": true
+      },
+      {
+        "id": 27,
+        "proposed_weekly_aud": 1466.45,
+        "historical_amount_aud": 10896.47,
+        "historical_period": "week",
+        "expected": [
+          10896.47,
+          -9430.02,
+          -490361.04,
+          -86.54
+        ],
+        "actual": [
+          10896.47,
+          -9430.02,
+          -490361.04,
+          -86.54
+        ],
+        "passed": true
+      },
+      {
+        "id": 28,
+        "proposed_weekly_aud": 214.21,
+        "historical_amount_aud": 13523.36,
+        "historical_period": "week",
+        "expected": [
+          13523.36,
+          -13309.15,
+          -692075.8,
+          -98.42
+        ],
+        "actual": [
+          13523.36,
+          -13309.15,
+          -692075.8,
+          -98.42
+        ],
+        "passed": true
+      },
+      {
+        "id": 29,
+        "proposed_weekly_aud": 747.82,
+        "historical_amount_aud": 32748.8,
+        "historical_period": "week",
+        "expected": [
+          32748.8,
+          -32000.98,
+          -1664050.96,
+          -97.72
+        ],
+        "actual": [
+          32748.8,
+          -32000.98,
+          -1664050.96,
+          -97.72
+        ],
+        "passed": true
+      },
+      {
+        "id": 30,
+        "proposed_weekly_aud": 505.1,
+        "historical_amount_aud": 15734.3,
+        "historical_period": "week",
+        "expected": [
+          15734.3,
+          -15229.2,
+          -791918.4,
+          -96.79
+        ],
+        "actual": [
+          15734.3,
+          -15229.2,
+          -791918.4,
+          -96.79
+        ],
+        "passed": true
+      },
+      {
+        "id": 31,
+        "proposed_weekly_aud": 1633.2,
+        "historical_amount_aud": 37124.59,
+        "historical_period": "week",
+        "expected": [
+          37124.59,
+          -35491.39,
+          -1845552.28,
+          -95.6
+        ],
+        "actual": [
+          37124.59,
+          -35491.39,
+          -1845552.28,
+          -95.6
+        ],
+        "passed": true
+      },
+      {
+        "id": 32,
+        "proposed_weekly_aud": 2353.99,
+        "historical_amount_aud": 41642.51,
+        "historical_period": "week",
+        "expected": [
+          41642.51,
+          -39288.52,
+          -2043003.04,
+          -94.35
+        ],
+        "actual": [
+          41642.51,
+          -39288.52,
+          -2043003.04,
+          -94.35
+        ],
+        "passed": true
+      },
+      {
+        "id": 33,
+        "proposed_weekly_aud": 2435.43,
+        "historical_amount_aud": 9856.37,
+        "historical_period": "week",
+        "expected": [
+          9856.37,
+          -7420.94,
+          -385888.88,
+          -75.29
+        ],
+        "actual": [
+          9856.37,
+          -7420.94,
+          -385888.88,
+          -75.29
+        ],
+        "passed": true
+      },
+      {
+        "id": 34,
+        "proposed_weekly_aud": 2060.3,
+        "historical_amount_aud": 56763.18,
+        "historical_period": "week",
+        "expected": [
+          56763.18,
+          -54702.88,
+          -2844549.76,
+          -96.37
+        ],
+        "actual": [
+          56763.18,
+          -54702.88,
+          -2844549.76,
+          -96.37
+        ],
+        "passed": true
+      },
+      {
+        "id": 35,
+        "proposed_weekly_aud": 916.56,
+        "historical_amount_aud": 1962.95,
+        "historical_period": "week",
+        "expected": [
+          1962.95,
+          -1046.39,
+          -54412.28,
+          -53.31
+        ],
+        "actual": [
+          1962.95,
+          -1046.39,
+          -54412.28,
+          -53.31
+        ],
+        "passed": true
+      },
+      {
+        "id": 36,
+        "proposed_weekly_aud": 1631.18,
+        "historical_amount_aud": 4754.69,
+        "historical_period": "week",
+        "expected": [
+          4754.69,
+          -3123.51,
+          -162422.52,
+          -65.69
+        ],
+        "actual": [
+          4754.69,
+          -3123.51,
+          -162422.52,
+          -65.69
+        ],
+        "passed": true
+      },
+      {
+        "id": 37,
+        "proposed_weekly_aud": 948.48,
+        "historical_amount_aud": 40486.84,
+        "historical_period": "week",
+        "expected": [
+          40486.84,
+          -39538.36,
+          -2055994.72,
+          -97.66
+        ],
+        "actual": [
+          40486.84,
+          -39538.36,
+          -2055994.72,
+          -97.66
+        ],
+        "passed": true
+      },
+      {
+        "id": 38,
+        "proposed_weekly_aud": 1594.18,
+        "historical_amount_aud": 54444.9,
+        "historical_period": "week",
+        "expected": [
+          54444.9,
+          -52850.72,
+          -2748237.44,
+          -97.07
+        ],
+        "actual": [
+          54444.9,
+          -52850.72,
+          -2748237.44,
+          -97.07
+        ],
+        "passed": true
+      },
+      {
+        "id": 39,
+        "proposed_weekly_aud": 1744.73,
+        "historical_amount_aud": 53103.37,
+        "historical_period": "week",
+        "expected": [
+          53103.37,
+          -51358.64,
+          -2670649.28,
+          -96.71
+        ],
+        "actual": [
+          53103.37,
+          -51358.64,
+          -2670649.28,
+          -96.71
+        ],
+        "passed": true
+      },
+      {
+        "id": 40,
+        "proposed_weekly_aud": 1669.5,
+        "historical_amount_aud": 10823.02,
+        "historical_period": "week",
+        "expected": [
+          10823.02,
+          -9153.52,
+          -475983.04,
+          -84.57
+        ],
+        "actual": [
+          10823.02,
+          -9153.52,
+          -475983.04,
+          -84.57
+        ],
+        "passed": true
+      },
+      {
+        "id": 41,
+        "proposed_weekly_aud": 462.47,
+        "historical_amount_aud": 40523.86,
+        "historical_period": "week",
+        "expected": [
+          40523.86,
+          -40061.39,
+          -2083192.28,
+          -98.86
+        ],
+        "actual": [
+          40523.86,
+          -40061.39,
+          -2083192.28,
+          -98.86
+        ],
+        "passed": true
+      },
+      {
+        "id": 42,
+        "proposed_weekly_aud": 2032.38,
+        "historical_amount_aud": 15713.23,
+        "historical_period": "week",
+        "expected": [
+          15713.23,
+          -13680.85,
+          -711404.2,
+          -87.07
+        ],
+        "actual": [
+          15713.23,
+          -13680.85,
+          -711404.2,
+          -87.07
+        ],
+        "passed": true
+      },
+      {
+        "id": 43,
+        "proposed_weekly_aud": 2049.92,
+        "historical_amount_aud": 6436.99,
+        "historical_period": "week",
+        "expected": [
+          6436.99,
+          -4387.07,
+          -228127.64,
+          -68.15
+        ],
+        "actual": [
+          6436.99,
+          -4387.07,
+          -228127.64,
+          -68.15
+        ],
+        "passed": true
+      },
+      {
+        "id": 44,
+        "proposed_weekly_aud": 2376.55,
+        "historical_amount_aud": 17088.98,
+        "historical_period": "week",
+        "expected": [
+          17088.98,
+          -14712.43,
+          -765046.36,
+          -86.09
+        ],
+        "actual": [
+          17088.98,
+          -14712.43,
+          -765046.36,
+          -86.09
+        ],
+        "passed": true
+      },
+      {
+        "id": 45,
+        "proposed_weekly_aud": 2128.22,
+        "historical_amount_aud": 53036.74,
+        "historical_period": "week",
+        "expected": [
+          53036.74,
+          -50908.52,
+          -2647243.04,
+          -95.99
+        ],
+        "actual": [
+          53036.74,
+          -50908.52,
+          -2647243.04,
+          -95.99
+        ],
+        "passed": true
+      },
+      {
+        "id": 46,
+        "proposed_weekly_aud": 1141.84,
+        "historical_amount_aud": 44984.92,
+        "historical_period": "fortnight",
+        "expected": [
+          22492.46,
+          -21350.62,
+          -1110232.24,
+          -94.92
+        ],
+        "actual": [
+          22492.46,
+          -21350.62,
+          -1110232.24,
+          -94.92
+        ],
+        "passed": true
+      },
+      {
+        "id": 47,
+        "proposed_weekly_aud": 2249.61,
+        "historical_amount_aud": 12145.93,
+        "historical_period": "fortnight",
+        "expected": [
+          6072.97,
+          -3823.36,
+          -198814.46,
+          -62.96
+        ],
+        "actual": [
+          6072.97,
+          -3823.36,
+          -198814.46,
+          -62.96
+        ],
+        "passed": true
+      },
+      {
+        "id": 48,
+        "proposed_weekly_aud": 1819.26,
+        "historical_amount_aud": 36443.66,
+        "historical_period": "fortnight",
+        "expected": [
+          18221.83,
+          -16402.57,
+          -852933.64,
+          -90.02
+        ],
+        "actual": [
+          18221.83,
+          -16402.57,
+          -852933.64,
+          -90.02
+        ],
+        "passed": true
+      },
+      {
+        "id": 49,
+        "proposed_weekly_aud": 1305.03,
+        "historical_amount_aud": 16522.29,
+        "historical_period": "fortnight",
+        "expected": [
+          8261.15,
+          -6956.12,
+          -361717.98,
+          -84.2
+        ],
+        "actual": [
+          8261.15,
+          -6956.12,
+          -361717.98,
+          -84.2
+        ],
+        "passed": true
+      },
+      {
+        "id": 50,
+        "proposed_weekly_aud": 1072.11,
+        "historical_amount_aud": 13252.27,
+        "historical_period": "fortnight",
+        "expected": [
+          6626.14,
+          -5554.03,
+          -288809.3,
+          -83.82
+        ],
+        "actual": [
+          6626.14,
+          -5554.03,
+          -288809.3,
+          -83.82
+        ],
+        "passed": true
+      },
+      {
+        "id": 51,
+        "proposed_weekly_aud": 2058.46,
+        "historical_amount_aud": 30779.02,
+        "historical_period": "fortnight",
+        "expected": [
+          15389.51,
+          -13331.05,
+          -693214.6,
+          -86.62
+        ],
+        "actual": [
+          15389.51,
+          -13331.05,
+          -693214.6,
+          -86.62
+        ],
+        "passed": true
+      },
+      {
+        "id": 52,
+        "proposed_weekly_aud": 1101.23,
+        "historical_amount_aud": 47240.75,
+        "historical_period": "fortnight",
+        "expected": [
+          23620.38,
+          -22519.15,
+          -1170995.54,
+          -95.34
+        ],
+        "actual": [
+          23620.38,
+          -22519.15,
+          -1170995.54,
+          -95.34
+        ],
+        "passed": true
+      },
+      {
+        "id": 53,
+        "proposed_weekly_aud": 1288.51,
+        "historical_amount_aud": 58857.69,
+        "historical_period": "fortnight",
+        "expected": [
+          29428.85,
+          -28140.34,
+          -1463297.42,
+          -95.62
+        ],
+        "actual": [
+          29428.85,
+          -28140.34,
+          -1463297.42,
+          -95.62
+        ],
+        "passed": true
+      },
+      {
+        "id": 54,
+        "proposed_weekly_aud": 649.68,
+        "historical_amount_aud": 32061.27,
+        "historical_period": "fortnight",
+        "expected": [
+          16030.64,
+          -15380.96,
+          -799809.66,
+          -95.95
+        ],
+        "actual": [
+          16030.64,
+          -15380.96,
+          -799809.66,
+          -95.95
+        ],
+        "passed": true
+      },
+      {
+        "id": 55,
+        "proposed_weekly_aud": 183.92,
+        "historical_amount_aud": 40312.36,
+        "historical_period": "fortnight",
+        "expected": [
+          20156.18,
+          -19972.26,
+          -1038557.52,
+          -99.09
+        ],
+        "actual": [
+          20156.18,
+          -19972.26,
+          -1038557.52,
+          -99.09
+        ],
+        "passed": true
+      },
+      {
+        "id": 56,
+        "proposed_weekly_aud": 318.05,
+        "historical_amount_aud": 4598.75,
+        "historical_period": "fortnight",
+        "expected": [
+          2299.38,
+          -1981.33,
+          -103028.9,
+          -86.17
+        ],
+        "actual": [
+          2299.38,
+          -1981.33,
+          -103028.9,
+          -86.17
+        ],
+        "passed": true
+      },
+      {
+        "id": 57,
+        "proposed_weekly_aud": 424.24,
+        "historical_amount_aud": 57504.14,
+        "historical_period": "fortnight",
+        "expected": [
+          28752.07,
+          -28327.83,
+          -1473047.16,
+          -98.52
+        ],
+        "actual": [
+          28752.07,
+          -28327.83,
+          -1473047.16,
+          -98.52
+        ],
+        "passed": true
+      },
+      {
+        "id": 58,
+        "proposed_weekly_aud": 2288.86,
+        "historical_amount_aud": 5260.86,
+        "historical_period": "fortnight",
+        "expected": [
+          2630.43,
+          -341.57,
+          -17761.64,
+          -12.99
+        ],
+        "actual": [
+          2630.43,
+          -341.57,
+          -17761.64,
+          -12.99
+        ],
+        "passed": true
+      },
+      {
+        "id": 59,
+        "proposed_weekly_aud": 183.08,
+        "historical_amount_aud": 22985.22,
+        "historical_period": "fortnight",
+        "expected": [
+          11492.61,
+          -11309.53,
+          -588095.56,
+          -98.41
+        ],
+        "actual": [
+          11492.61,
+          -11309.53,
+          -588095.56,
+          -98.41
+        ],
+        "passed": true
+      },
+      {
+        "id": 60,
+        "proposed_weekly_aud": 1903.57,
+        "historical_amount_aud": 16966.19,
+        "historical_period": "fortnight",
+        "expected": [
+          8483.1,
+          -6579.53,
+          -342135.3,
+          -77.56
+        ],
+        "actual": [
+          8483.1,
+          -6579.53,
+          -342135.3,
+          -77.56
+        ],
+        "passed": true
+      },
+      {
+        "id": 61,
+        "proposed_weekly_aud": 674.05,
+        "historical_amount_aud": 59104.13,
+        "historical_period": "fortnight",
+        "expected": [
+          29552.07,
+          -28878.02,
+          -1501656.78,
+          -97.72
+        ],
+        "actual": [
+          29552.07,
+          -28878.02,
+          -1501656.78,
+          -97.72
+        ],
+        "passed": true
+      },
+      {
+        "id": 62,
+        "proposed_weekly_aud": 317.87,
+        "historical_amount_aud": 32713.16,
+        "historical_period": "fortnight",
+        "expected": [
+          16356.58,
+          -16038.71,
+          -834012.92,
+          -98.06
+        ],
+        "actual": [
+          16356.58,
+          -16038.71,
+          -834012.92,
+          -98.06
+        ],
+        "passed": true
+      },
+      {
+        "id": 63,
+        "proposed_weekly_aud": 1293.48,
+        "historical_amount_aud": 59604.63,
+        "historical_period": "fortnight",
+        "expected": [
+          29802.32,
+          -28508.84,
+          -1482459.42,
+          -95.66
+        ],
+        "actual": [
+          29802.32,
+          -28508.84,
+          -1482459.42,
+          -95.66
+        ],
+        "passed": true
+      },
+      {
+        "id": 64,
+        "proposed_weekly_aud": 2320.58,
+        "historical_amount_aud": 54339.98,
+        "historical_period": "fortnight",
+        "expected": [
+          27169.99,
+          -24849.41,
+          -1292169.32,
+          -91.46
+        ],
+        "actual": [
+          27169.99,
+          -24849.41,
+          -1292169.32,
+          -91.46
+        ],
+        "passed": true
+      },
+      {
+        "id": 65,
+        "proposed_weekly_aud": 210.62,
+        "historical_amount_aud": 3896.75,
+        "historical_period": "fortnight",
+        "expected": [
+          1948.38,
+          -1737.76,
+          -90363.26,
+          -89.19
+        ],
+        "actual": [
+          1948.38,
+          -1737.76,
+          -90363.26,
+          -89.19
+        ],
+        "passed": true
+      },
+      {
+        "id": 66,
+        "proposed_weekly_aud": 856.68,
+        "historical_amount_aud": 5860.14,
+        "historical_period": "fortnight",
+        "expected": [
+          2930.07,
+          -2073.39,
+          -107816.28,
+          -70.76
+        ],
+        "actual": [
+          2930.07,
+          -2073.39,
+          -107816.28,
+          -70.76
+        ],
+        "passed": true
+      },
+      {
+        "id": 67,
+        "proposed_weekly_aud": 665.4,
+        "historical_amount_aud": 34456.56,
+        "historical_period": "fortnight",
+        "expected": [
+          17228.28,
+          -16562.88,
+          -861269.76,
+          -96.14
+        ],
+        "actual": [
+          17228.28,
+          -16562.88,
+          -861269.76,
+          -96.14
+        ],
+        "passed": true
+      },
+      {
+        "id": 68,
+        "proposed_weekly_aud": 1433.92,
+        "historical_amount_aud": 9991.02,
+        "historical_period": "fortnight",
+        "expected": [
+          4995.51,
+          -3561.59,
+          -185202.68,
+          -71.3
+        ],
+        "actual": [
+          4995.51,
+          -3561.59,
+          -185202.68,
+          -71.3
+        ],
+        "passed": true
+      },
+      {
+        "id": 69,
+        "proposed_weekly_aud": 2479.67,
+        "historical_amount_aud": 2929.83,
+        "historical_period": "fortnight",
+        "expected": [
+          1464.92,
+          1014.76,
+          52767.26,
+          69.27
+        ],
+        "actual": [
+          1464.92,
+          1014.76,
+          52767.26,
+          69.27
+        ],
+        "passed": true
+      },
+      {
+        "id": 70,
+        "proposed_weekly_aud": 50.5,
+        "historical_amount_aud": 28788.28,
+        "historical_period": "fortnight",
+        "expected": [
+          14394.14,
+          -14343.64,
+          -745869.28,
+          -99.65
+        ],
+        "actual": [
+          14394.14,
+          -14343.64,
+          -745869.28,
+          -99.65
+        ],
+        "passed": true
+      },
+      {
+        "id": 71,
+        "proposed_weekly_aud": 36.68,
+        "historical_amount_aud": 45242.92,
+        "historical_period": "fortnight",
+        "expected": [
+          22621.46,
+          -22584.78,
+          -1174408.56,
+          -99.84
+        ],
+        "actual": [
+          22621.46,
+          -22584.78,
+          -1174408.56,
+          -99.84
+        ],
+        "passed": true
+      },
+      {
+        "id": 72,
+        "proposed_weekly_aud": 1807.88,
+        "historical_amount_aud": 45431.35,
+        "historical_period": "fortnight",
+        "expected": [
+          22715.68,
+          -20907.8,
+          -1087205.34,
+          -92.04
+        ],
+        "actual": [
+          22715.68,
+          -20907.8,
+          -1087205.34,
+          -92.04
+        ],
+        "passed": true
+      },
+      {
+        "id": 73,
+        "proposed_weekly_aud": 1822.61,
+        "historical_amount_aud": 56110.11,
+        "historical_period": "fortnight",
+        "expected": [
+          28055.06,
+          -26232.45,
+          -1364087.14,
+          -93.5
+        ],
+        "actual": [
+          28055.06,
+          -26232.45,
+          -1364087.14,
+          -93.5
+        ],
+        "passed": true
+      },
+      {
+        "id": 74,
+        "proposed_weekly_aud": 915.55,
+        "historical_amount_aud": 22390.7,
+        "historical_period": "fortnight",
+        "expected": [
+          11195.35,
+          -10279.8,
+          -534549.6,
+          -91.82
+        ],
+        "actual": [
+          11195.35,
+          -10279.8,
+          -534549.6,
+          -91.82
+        ],
+        "passed": true
+      },
+      {
+        "id": 75,
+        "proposed_weekly_aud": 1510.44,
+        "historical_amount_aud": 20717.23,
+        "historical_period": "fortnight",
+        "expected": [
+          10358.62,
+          -8848.18,
+          -460105.1,
+          -85.42
+        ],
+        "actual": [
+          10358.62,
+          -8848.18,
+          -460105.1,
+          -85.42
+        ],
+        "passed": true
+      },
+      {
+        "id": 76,
+        "proposed_weekly_aud": 2378.31,
+        "historical_amount_aud": 5745.12,
+        "historical_period": "fortnight",
+        "expected": [
+          2872.56,
+          -494.25,
+          -25701.0,
+          -17.21
+        ],
+        "actual": [
+          2872.56,
+          -494.25,
+          -25701.0,
+          -17.21
+        ],
+        "passed": true
+      },
+      {
+        "id": 77,
+        "proposed_weekly_aud": 664.36,
+        "historical_amount_aud": 5366.82,
+        "historical_period": "fortnight",
+        "expected": [
+          2683.41,
+          -2019.05,
+          -104990.6,
+          -75.24
+        ],
+        "actual": [
+          2683.41,
+          -2019.05,
+          -104990.6,
+          -75.24
+        ],
+        "passed": true
+      },
+      {
+        "id": 78,
+        "proposed_weekly_aud": 1703.69,
+        "historical_amount_aud": 44973.78,
+        "historical_period": "fortnight",
+        "expected": [
+          22486.89,
+          -20783.2,
+          -1080726.4,
+          -92.42
+        ],
+        "actual": [
+          22486.89,
+          -20783.2,
+          -1080726.4,
+          -92.42
+        ],
+        "passed": true
+      },
+      {
+        "id": 79,
+        "proposed_weekly_aud": 773.01,
+        "historical_amount_aud": 51817.16,
+        "historical_period": "fortnight",
+        "expected": [
+          25908.58,
+          -25135.57,
+          -1307049.64,
+          -97.02
+        ],
+        "actual": [
+          25908.58,
+          -25135.57,
+          -1307049.64,
+          -97.02
+        ],
+        "passed": true
+      },
+      {
+        "id": 80,
+        "proposed_weekly_aud": 2472.05,
+        "historical_amount_aud": 34930.74,
+        "historical_period": "fortnight",
+        "expected": [
+          17465.37,
+          -14993.32,
+          -779652.64,
+          -85.85
+        ],
+        "actual": [
+          17465.37,
+          -14993.32,
+          -779652.64,
+          -85.85
+        ],
+        "passed": true
+      },
+      {
+        "id": 81,
+        "proposed_weekly_aud": 2328.55,
+        "historical_amount_aud": 17569.88,
+        "historical_period": "fortnight",
+        "expected": [
+          8784.94,
+          -6456.39,
+          -335732.28,
+          -73.49
+        ],
+        "actual": [
+          8784.94,
+          -6456.39,
+          -335732.28,
+          -73.49
+        ],
+        "passed": true
+      },
+      {
+        "id": 82,
+        "proposed_weekly_aud": 1896.9,
+        "historical_amount_aud": 37502.92,
+        "historical_period": "fortnight",
+        "expected": [
+          18751.46,
+          -16854.56,
+          -876437.12,
+          -89.88
+        ],
+        "actual": [
+          18751.46,
+          -16854.56,
+          -876437.12,
+          -89.88
+        ],
+        "passed": true
+      },
+      {
+        "id": 83,
+        "proposed_weekly_aud": 2234.59,
+        "historical_amount_aud": 7928.6,
+        "historical_period": "fortnight",
+        "expected": [
+          3964.3,
+          -1729.71,
+          -89944.92,
+          -43.63
+        ],
+        "actual": [
+          3964.3,
+          -1729.71,
+          -89944.92,
+          -43.63
+        ],
+        "passed": true
+      },
+      {
+        "id": 84,
+        "proposed_weekly_aud": 1340.68,
+        "historical_amount_aud": 49263.77,
+        "historical_period": "fortnight",
+        "expected": [
+          24631.89,
+          -23291.21,
+          -1211142.66,
+          -94.56
+        ],
+        "actual": [
+          24631.89,
+          -23291.21,
+          -1211142.66,
+          -94.56
+        ],
+        "passed": true
+      },
+      {
+        "id": 85,
+        "proposed_weekly_aud": 1934.35,
+        "historical_amount_aud": 33722.08,
+        "historical_period": "fortnight",
+        "expected": [
+          16861.04,
+          -14926.69,
+          -776187.88,
+          -88.53
+        ],
+        "actual": [
+          16861.04,
+          -14926.69,
+          -776187.88,
+          -88.53
+        ],
+        "passed": true
+      },
+      {
+        "id": 86,
+        "proposed_weekly_aud": 391.78,
+        "historical_amount_aud": 15032.78,
+        "historical_period": "month",
+        "expected": [
+          3469.1,
+          -3077.32,
+          -160020.8,
+          -88.71
+        ],
+        "actual": [
+          3469.1,
+          -3077.32,
+          -160020.8,
+          -88.71
+        ],
+        "passed": true
+      },
+      {
+        "id": 87,
+        "proposed_weekly_aud": 1492.03,
+        "historical_amount_aud": 8762.9,
+        "historical_period": "month",
+        "expected": [
+          2022.21,
+          -530.18,
+          -27569.24,
+          -26.22
+        ],
+        "actual": [
+          2022.21,
+          -530.18,
+          -27569.24,
+          -26.22
+        ],
+        "passed": true
+      },
+      {
+        "id": 88,
+        "proposed_weekly_aud": 1463.99,
+        "historical_amount_aud": 57665.51,
+        "historical_period": "month",
+        "expected": [
+          13307.43,
+          -11843.44,
+          -615858.64,
+          -89.0
+        ],
+        "actual": [
+          13307.43,
+          -11843.44,
+          -615858.64,
+          -89.0
+        ],
+        "passed": true
+      },
+      {
+        "id": 89,
+        "proposed_weekly_aud": 21.18,
+        "historical_amount_aud": 6859.73,
+        "historical_period": "month",
+        "expected": [
+          1583.01,
+          -1561.83,
+          -81215.4,
+          -98.66
+        ],
+        "actual": [
+          1583.01,
+          -1561.83,
+          -81215.4,
+          -98.66
+        ],
+        "passed": true
+      },
+      {
+        "id": 90,
+        "proposed_weekly_aud": 58.01,
+        "historical_amount_aud": 17587.85,
+        "historical_period": "month",
+        "expected": [
+          4058.73,
+          -4000.72,
+          -208037.68,
+          -98.57
+        ],
+        "actual": [
+          4058.73,
+          -4000.72,
+          -208037.68,
+          -98.57
+        ],
+        "passed": true
+      },
+      {
+        "id": 91,
+        "proposed_weekly_aud": 1826.39,
+        "historical_amount_aud": 25274.26,
+        "historical_period": "month",
+        "expected": [
+          5832.52,
+          -4006.13,
+          -208318.84,
+          -68.69
+        ],
+        "actual": [
+          5832.52,
+          -4006.13,
+          -208318.84,
+          -68.69
+        ],
+        "passed": true
+      },
+      {
+        "id": 92,
+        "proposed_weekly_aud": 58.93,
+        "historical_amount_aud": 43767.25,
+        "historical_period": "month",
+        "expected": [
+          10100.13,
+          -10041.2,
+          -522142.64,
+          -99.42
+        ],
+        "actual": [
+          10100.13,
+          -10041.2,
+          -522142.64,
+          -99.42
+        ],
+        "passed": true
+      },
+      {
+        "id": 93,
+        "proposed_weekly_aud": 2263.86,
+        "historical_amount_aud": 11082.0,
+        "historical_period": "month",
+        "expected": [
+          2557.38,
+          -293.52,
+          -15263.28,
+          -11.48
+        ],
+        "actual": [
+          2557.38,
+          -293.52,
+          -15263.28,
+          -11.48
+        ],
+        "passed": true
+      },
+      {
+        "id": 94,
+        "proposed_weekly_aud": 706.09,
+        "historical_amount_aud": 27425.06,
+        "historical_period": "month",
+        "expected": [
+          6328.86,
+          -5622.77,
+          -292384.04,
+          -88.84
+        ],
+        "actual": [
+          6328.86,
+          -5622.77,
+          -292384.04,
+          -88.84
+        ],
+        "passed": true
+      },
+      {
+        "id": 95,
+        "proposed_weekly_aud": 412.07,
+        "historical_amount_aud": 16774.72,
+        "historical_period": "month",
+        "expected": [
+          3871.09,
+          -3459.02,
+          -179869.0,
+          -89.36
+        ],
+        "actual": [
+          3871.09,
+          -3459.02,
+          -179869.0,
+          -89.36
+        ],
+        "passed": true
+      },
+      {
+        "id": 96,
+        "proposed_weekly_aud": 1595.34,
+        "historical_amount_aud": 33729.06,
+        "historical_period": "month",
+        "expected": [
+          7783.63,
+          -6188.29,
+          -321791.04,
+          -79.5
+        ],
+        "actual": [
+          7783.63,
+          -6188.29,
+          -321791.04,
+          -79.5
+        ],
+        "passed": true
+      },
+      {
+        "id": 97,
+        "proposed_weekly_aud": 792.41,
+        "historical_amount_aud": 36224.02,
+        "historical_period": "month",
+        "expected": [
+          8359.39,
+          -7566.98,
+          -393482.92,
+          -90.52
+        ],
+        "actual": [
+          8359.39,
+          -7566.98,
+          -393482.92,
+          -90.52
+        ],
+        "passed": true
+      },
+      {
+        "id": 98,
+        "proposed_weekly_aud": 2075.69,
+        "historical_amount_aud": 16167.32,
+        "historical_period": "month",
+        "expected": [
+          3730.92,
+          -1655.23,
+          -86071.96,
+          -44.37
+        ],
+        "actual": [
+          3730.92,
+          -1655.23,
+          -86071.96,
+          -44.37
+        ],
+        "passed": true
+      },
+      {
+        "id": 99,
+        "proposed_weekly_aud": 1631.57,
+        "historical_amount_aud": 10701.58,
+        "historical_period": "month",
+        "expected": [
+          2469.6,
+          -838.03,
+          -43577.32,
+          -33.93
+        ],
+        "actual": [
+          2469.6,
+          -838.03,
+          -43577.32,
+          -33.93
+        ],
+        "passed": true
+      },
+      {
+        "id": 100,
+        "proposed_weekly_aud": 1375.59,
+        "historical_amount_aud": 25385.72,
+        "historical_period": "month",
+        "expected": [
+          5858.24,
+          -4482.65,
+          -233097.96,
+          -76.52
+        ],
+        "actual": [
+          5858.24,
+          -4482.65,
+          -233097.96,
+          -76.52
+        ],
+        "passed": true
+      },
+      {
+        "id": 101,
+        "proposed_weekly_aud": 2130.98,
+        "historical_amount_aud": 38510.51,
+        "historical_period": "month",
+        "expected": [
+          8887.04,
+          -6756.06,
+          -351315.16,
+          -76.02
+        ],
+        "actual": [
+          8887.04,
+          -6756.06,
+          -351315.16,
+          -76.02
+        ],
+        "passed": true
+      },
+      {
+        "id": 102,
+        "proposed_weekly_aud": 2417.67,
+        "historical_amount_aud": 31742.93,
+        "historical_period": "month",
+        "expected": [
+          7325.29,
+          -4907.62,
+          -255196.32,
+          -67.0
+        ],
+        "actual": [
+          7325.29,
+          -4907.62,
+          -255196.32,
+          -67.0
+        ],
+        "passed": true
+      },
+      {
+        "id": 103,
+        "proposed_weekly_aud": 2421.74,
+        "historical_amount_aud": 15698.72,
+        "historical_period": "month",
+        "expected": [
+          3622.78,
+          -1201.04,
+          -62454.16,
+          -33.15
+        ],
+        "actual": [
+          3622.78,
+          -1201.04,
+          -62454.16,
+          -33.15
+        ],
+        "passed": true
+      },
+      {
+        "id": 104,
+        "proposed_weekly_aud": 876.07,
+        "historical_amount_aud": 32789.02,
+        "historical_period": "month",
+        "expected": [
+          7566.7,
+          -6690.63,
+          -347912.6,
+          -88.42
+        ],
+        "actual": [
+          7566.7,
+          -6690.63,
+          -347912.6,
+          -88.42
+        ],
+        "passed": true
+      },
+      {
+        "id": 105,
+        "proposed_weekly_aud": 2199.1,
+        "historical_amount_aud": 28504.6,
+        "historical_period": "month",
+        "expected": [
+          6577.98,
+          -4378.88,
+          -227702.0,
+          -66.57
+        ],
+        "actual": [
+          6577.98,
+          -4378.88,
+          -227702.0,
+          -66.57
+        ],
+        "passed": true
+      },
+      {
+        "id": 106,
+        "proposed_weekly_aud": 1492.51,
+        "historical_amount_aud": 877.73,
+        "historical_period": "month",
+        "expected": [
+          202.55,
+          1289.96,
+          67077.76,
+          636.85
+        ],
+        "actual": [
+          202.55,
+          1289.96,
+          67077.76,
+          636.85
+        ],
+        "passed": true
+      },
+      {
+        "id": 107,
+        "proposed_weekly_aud": 2372.38,
+        "historical_amount_aud": 15106.02,
+        "historical_period": "month",
+        "expected": [
+          3486.0,
+          -1113.62,
+          -57908.48,
+          -31.95
+        ],
+        "actual": [
+          3486.0,
+          -1113.62,
+          -57908.48,
+          -31.95
+        ],
+        "passed": true
+      },
+      {
+        "id": 108,
+        "proposed_weekly_aud": 357.81,
+        "historical_amount_aud": 7479.0,
+        "historical_period": "month",
+        "expected": [
+          1725.92,
+          -1368.11,
+          -71141.88,
+          -79.27
+        ],
+        "actual": [
+          1725.92,
+          -1368.11,
+          -71141.88,
+          -79.27
+        ],
+        "passed": true
+      },
+      {
+        "id": 109,
+        "proposed_weekly_aud": 2347.66,
+        "historical_amount_aud": 28661.66,
+        "historical_period": "month",
+        "expected": [
+          6614.23,
+          -4266.57,
+          -221861.6,
+          -64.51
+        ],
+        "actual": [
+          6614.23,
+          -4266.57,
+          -221861.6,
+          -64.51
+        ],
+        "passed": true
+      },
+      {
+        "id": 110,
+        "proposed_weekly_aud": 1238.92,
+        "historical_amount_aud": 6103.99,
+        "historical_period": "month",
+        "expected": [
+          1408.61,
+          -169.69,
+          -8824.04,
+          -12.05
+        ],
+        "actual": [
+          1408.61,
+          -169.69,
+          -8824.04,
+          -12.05
+        ],
+        "passed": true
+      },
+      {
+        "id": 111,
+        "proposed_weekly_aud": 1901.14,
+        "historical_amount_aud": 49797.37,
+        "historical_period": "month",
+        "expected": [
+          11491.7,
+          -9590.56,
+          -498709.16,
+          -83.46
+        ],
+        "actual": [
+          11491.7,
+          -9590.56,
+          -498709.16,
+          -83.46
+        ],
+        "passed": true
+      },
+      {
+        "id": 112,
+        "proposed_weekly_aud": 1525.01,
+        "historical_amount_aud": 735.44,
+        "historical_period": "month",
+        "expected": [
+          169.72,
+          1355.29,
+          70475.24,
+          798.56
+        ],
+        "actual": [
+          169.72,
+          1355.29,
+          70475.24,
+          798.56
+        ],
+        "passed": true
+      },
+      {
+        "id": 113,
+        "proposed_weekly_aud": 389.0,
+        "historical_amount_aud": 50756.54,
+        "historical_period": "month",
+        "expected": [
+          11713.05,
+          -11324.05,
+          -588850.48,
+          -96.68
+        ],
+        "actual": [
+          11713.05,
+          -11324.05,
+          -588850.48,
+          -96.68
+        ],
+        "passed": true
+      },
+      {
+        "id": 114,
+        "proposed_weekly_aud": 985.18,
+        "historical_amount_aud": 41515.84,
+        "historical_period": "month",
+        "expected": [
+          9580.58,
+          -8595.4,
+          -446960.72,
+          -89.72
+        ],
+        "actual": [
+          9580.58,
+          -8595.4,
+          -446960.72,
+          -89.72
+        ],
+        "passed": true
+      },
+      {
+        "id": 115,
+        "proposed_weekly_aud": 2206.28,
+        "historical_amount_aud": 810.73,
+        "historical_period": "month",
+        "expected": [
+          187.09,
+          2019.19,
+          104997.8,
+          1079.25
+        ],
+        "actual": [
+          187.09,
+          2019.19,
+          104997.8,
+          1079.25
+        ],
+        "passed": true
+      },
+      {
+        "id": 116,
+        "proposed_weekly_aud": 1362.9,
+        "historical_amount_aud": 32664.56,
+        "historical_period": "month",
+        "expected": [
+          7537.98,
+          -6175.08,
+          -321103.92,
+          -81.92
+        ],
+        "actual": [
+          7537.98,
+          -6175.08,
+          -321103.92,
+          -81.92
+        ],
+        "passed": true
+      },
+      {
+        "id": 117,
+        "proposed_weekly_aud": 902.79,
+        "historical_amount_aud": 48658.28,
+        "historical_period": "month",
+        "expected": [
+          11228.83,
+          -10326.04,
+          -536954.28,
+          -91.96
+        ],
+        "actual": [
+          11228.83,
+          -10326.04,
+          -536954.28,
+          -91.96
+        ],
+        "passed": true
+      },
+      {
+        "id": 118,
+        "proposed_weekly_aud": 873.55,
+        "historical_amount_aud": 50606.91,
+        "historical_period": "month",
+        "expected": [
+          11678.52,
+          -10804.97,
+          -561858.32,
+          -92.52
+        ],
+        "actual": [
+          11678.52,
+          -10804.97,
+          -561858.32,
+          -92.52
+        ],
+        "passed": true
+      },
+      {
+        "id": 119,
+        "proposed_weekly_aud": 2131.63,
+        "historical_amount_aud": 47684.95,
+        "historical_period": "month",
+        "expected": [
+          11004.22,
+          -8872.59,
+          -461374.64,
+          -80.63
+        ],
+        "actual": [
+          11004.22,
+          -8872.59,
+          -461374.64,
+          -80.63
+        ],
+        "passed": true
+      },
+      {
+        "id": 120,
+        "proposed_weekly_aud": 307.62,
+        "historical_amount_aud": 52771.61,
+        "historical_period": "month",
+        "expected": [
+          12178.06,
+          -11870.44,
+          -617263.08,
+          -97.47
+        ],
+        "actual": [
+          12178.06,
+          -11870.44,
+          -617263.08,
+          -97.47
+        ],
+        "passed": true
+      },
+      {
+        "id": 121,
+        "proposed_weekly_aud": 752.14,
+        "historical_amount_aud": 10899.33,
+        "historical_period": "month",
+        "expected": [
+          2515.23,
+          -1763.09,
+          -91680.68,
+          -70.1
+        ],
+        "actual": [
+          2515.23,
+          -1763.09,
+          -91680.68,
+          -70.1
+        ],
+        "passed": true
+      },
+      {
+        "id": 122,
+        "proposed_weekly_aud": 2179.12,
+        "historical_amount_aud": 24683.4,
+        "historical_period": "month",
+        "expected": [
+          5696.17,
+          -3517.05,
+          -182886.56,
+          -61.74
+        ],
+        "actual": [
+          5696.17,
+          -3517.05,
+          -182886.56,
+          -61.74
+        ],
+        "passed": true
+      },
+      {
+        "id": 123,
+        "proposed_weekly_aud": 1615.57,
+        "historical_amount_aud": 89.91,
+        "historical_period": "month",
+        "expected": [
+          20.75,
+          1594.82,
+          82930.72,
+          7686.46
+        ],
+        "actual": [
+          20.75,
+          1594.82,
+          82930.72,
+          7686.46
+        ],
+        "passed": true
+      },
+      {
+        "id": 124,
+        "proposed_weekly_aud": 110.62,
+        "historical_amount_aud": 52584.02,
+        "historical_period": "month",
+        "expected": [
+          12134.77,
+          -12024.15,
+          -625256.0,
+          -99.09
+        ],
+        "actual": [
+          12134.77,
+          -12024.15,
+          -625256.0,
+          -99.09
+        ],
+        "passed": true
+      },
+      {
+        "id": 125,
+        "proposed_weekly_aud": 1435.46,
+        "historical_amount_aud": 36826.07,
+        "historical_period": "month",
+        "expected": [
+          8498.32,
+          -7062.86,
+          -367268.92,
+          -83.11
+        ],
+        "actual": [
+          8498.32,
+          -7062.86,
+          -367268.92,
+          -83.11
+        ],
+        "passed": true
+      },
+      {
+        "id": 126,
+        "proposed_weekly_aud": 2328.04,
+        "historical_amount_aud": 23491.33,
+        "historical_period": "year",
+        "expected": [
+          451.76,
+          1876.28,
+          97566.75,
+          415.33
+        ],
+        "actual": [
+          451.76,
+          1876.28,
+          97566.75,
+          415.33
+        ],
+        "passed": true
+      },
+      {
+        "id": 127,
+        "proposed_weekly_aud": 1072.96,
+        "historical_amount_aud": 6317.08,
+        "historical_period": "year",
+        "expected": [
+          121.48,
+          951.48,
+          49476.84,
+          783.22
+        ],
+        "actual": [
+          121.48,
+          951.48,
+          49476.84,
+          783.22
+        ],
+        "passed": true
+      },
+      {
+        "id": 128,
+        "proposed_weekly_aud": 567.01,
+        "historical_amount_aud": 31769.89,
+        "historical_period": "year",
+        "expected": [
+          610.96,
+          -43.95,
+          -2285.37,
+          -7.19
+        ],
+        "actual": [
+          610.96,
+          -43.95,
+          -2285.37,
+          -7.19
+        ],
+        "passed": true
+      },
+      {
+        "id": 129,
+        "proposed_weekly_aud": 252.58,
+        "historical_amount_aud": 47344.42,
+        "historical_period": "year",
+        "expected": [
+          910.47,
+          -657.89,
+          -34210.26,
+          -72.26
+        ],
+        "actual": [
+          910.47,
+          -657.89,
+          -34210.26,
+          -72.26
+        ],
+        "passed": true
+      },
+      {
+        "id": 130,
+        "proposed_weekly_aud": 85.21,
+        "historical_amount_aud": 9467.77,
+        "historical_period": "year",
+        "expected": [
+          182.07,
+          -96.86,
+          -5036.85,
+          -53.2
+        ],
+        "actual": [
+          182.07,
+          -96.86,
+          -5036.85,
+          -53.2
+        ],
+        "passed": true
+      },
+      {
+        "id": 131,
+        "proposed_weekly_aud": 1124.0,
+        "historical_amount_aud": 33772.85,
+        "historical_period": "year",
+        "expected": [
+          649.48,
+          474.52,
+          24675.15,
+          73.06
+        ],
+        "actual": [
+          649.48,
+          474.52,
+          24675.15,
+          73.06
+        ],
+        "passed": true
+      },
+      {
+        "id": 132,
+        "proposed_weekly_aud": 247.06,
+        "historical_amount_aud": 16541.05,
+        "historical_period": "year",
+        "expected": [
+          318.1,
+          -71.04,
+          -3693.93,
+          -22.33
+        ],
+        "actual": [
+          318.1,
+          -71.04,
+          -3693.93,
+          -22.33
+        ],
+        "passed": true
+      },
+      {
+        "id": 133,
+        "proposed_weekly_aud": 2395.54,
+        "historical_amount_aud": 19908.83,
+        "historical_period": "year",
+        "expected": [
+          382.86,
+          2012.68,
+          104659.25,
+          525.69
+        ],
+        "actual": [
+          382.86,
+          2012.68,
+          104659.25,
+          525.69
+        ],
+        "passed": true
+      },
+      {
+        "id": 134,
+        "proposed_weekly_aud": 1401.73,
+        "historical_amount_aud": 21086.52,
+        "historical_period": "year",
+        "expected": [
+          405.51,
+          996.22,
+          51803.44,
+          245.67
+        ],
+        "actual": [
+          405.51,
+          996.22,
+          51803.44,
+          245.67
+        ],
+        "passed": true
+      },
+      {
+        "id": 135,
+        "proposed_weekly_aud": 1140.64,
+        "historical_amount_aud": 15188.56,
+        "historical_period": "year",
+        "expected": [
+          292.09,
+          848.55,
+          44124.72,
+          290.51
+        ],
+        "actual": [
+          292.09,
+          848.55,
+          44124.72,
+          290.51
+        ],
+        "passed": true
+      },
+      {
+        "id": 136,
+        "proposed_weekly_aud": 260.29,
+        "historical_amount_aud": 11441.02,
+        "historical_period": "year",
+        "expected": [
+          220.02,
+          40.27,
+          2094.06,
+          18.3
+        ],
+        "actual": [
+          220.02,
+          40.27,
+          2094.06,
+          18.3
+        ],
+        "passed": true
+      },
+      {
+        "id": 137,
+        "proposed_weekly_aud": 1484.62,
+        "historical_amount_aud": 50592.89,
+        "historical_period": "year",
+        "expected": [
+          972.94,
+          511.68,
+          26607.35,
+          52.59
+        ],
+        "actual": [
+          972.94,
+          511.68,
+          26607.35,
+          52.59
+        ],
+        "passed": true
+      },
+      {
+        "id": 138,
+        "proposed_weekly_aud": 826.86,
+        "historical_amount_aud": 28309.3,
+        "historical_period": "year",
+        "expected": [
+          544.41,
+          282.45,
+          14687.42,
+          51.88
+        ],
+        "actual": [
+          544.41,
+          282.45,
+          14687.42,
+          51.88
+        ],
+        "passed": true
+      },
+      {
+        "id": 139,
+        "proposed_weekly_aud": 510.4,
+        "historical_amount_aud": 24555.91,
+        "historical_period": "year",
+        "expected": [
+          472.23,
+          38.17,
+          1984.89,
+          8.08
+        ],
+        "actual": [
+          472.23,
+          38.17,
+          1984.89,
+          8.08
+        ],
+        "passed": true
+      },
+      {
+        "id": 140,
+        "proposed_weekly_aud": 1426.59,
+        "historical_amount_aud": 5915.24,
+        "historical_period": "year",
+        "expected": [
+          113.75,
+          1312.84,
+          68267.44,
+          1154.09
+        ],
+        "actual": [
+          113.75,
+          1312.84,
+          68267.44,
+          1154.09
+        ],
+        "passed": true
+      },
+      {
+        "id": 141,
+        "proposed_weekly_aud": 1728.11,
+        "historical_amount_aud": 16451.06,
+        "historical_period": "year",
+        "expected": [
+          316.37,
+          1411.74,
+          73410.66,
+          446.24
+        ],
+        "actual": [
+          316.37,
+          1411.74,
+          73410.66,
+          446.24
+        ],
+        "passed": true
+      },
+      {
+        "id": 142,
+        "proposed_weekly_aud": 2101.89,
+        "historical_amount_aud": 39957.15,
+        "historical_period": "year",
+        "expected": [
+          768.41,
+          1333.48,
+          69341.13,
+          173.54
+        ],
+        "actual": [
+          768.41,
+          1333.48,
+          69341.13,
+          173.54
+        ],
+        "passed": true
+      },
+      {
+        "id": 143,
+        "proposed_weekly_aud": 62.18,
+        "historical_amount_aud": 49221.3,
+        "historical_period": "year",
+        "expected": [
+          946.56,
+          -884.38,
+          -45987.94,
+          -93.43
+        ],
+        "actual": [
+          946.56,
+          -884.38,
+          -45987.94,
+          -93.43
+        ],
+        "passed": true
+      },
+      {
+        "id": 144,
+        "proposed_weekly_aud": 598.71,
+        "historical_amount_aud": 46192.64,
+        "historical_period": "year",
+        "expected": [
+          888.32,
+          -289.61,
+          -15059.72,
+          -32.6
+        ],
+        "actual": [
+          888.32,
+          -289.61,
+          -15059.72,
+          -32.6
+        ],
+        "passed": true
+      },
+      {
+        "id": 145,
+        "proposed_weekly_aud": 1360.33,
+        "historical_amount_aud": 6588.01,
+        "historical_period": "year",
+        "expected": [
+          126.69,
+          1233.64,
+          64149.15,
+          973.73
+        ],
+        "actual": [
+          126.69,
+          1233.64,
+          64149.15,
+          973.73
+        ],
+        "passed": true
+      },
+      {
+        "id": 146,
+        "proposed_weekly_aud": 355.02,
+        "historical_amount_aud": 16497.47,
+        "historical_period": "year",
+        "expected": [
+          317.26,
+          37.76,
+          1963.57,
+          11.9
+        ],
+        "actual": [
+          317.26,
+          37.76,
+          1963.57,
+          11.9
+        ],
+        "passed": true
+      },
+      {
+        "id": 147,
+        "proposed_weekly_aud": 69.75,
+        "historical_amount_aud": 618.57,
+        "historical_period": "year",
+        "expected": [
+          11.9,
+          57.85,
+          3008.43,
+          486.35
+        ],
+        "actual": [
+          11.9,
+          57.85,
+          3008.43,
+          486.35
+        ],
+        "passed": true
+      },
+      {
+        "id": 148,
+        "proposed_weekly_aud": 2120.53,
+        "historical_amount_aud": 19897.39,
+        "historical_period": "year",
+        "expected": [
+          382.64,
+          1737.89,
+          90370.17,
+          454.18
+        ],
+        "actual": [
+          382.64,
+          1737.89,
+          90370.17,
+          454.18
+        ],
+        "passed": true
+      },
+      {
+        "id": 149,
+        "proposed_weekly_aud": 314.84,
+        "historical_amount_aud": 27753.62,
+        "historical_period": "year",
+        "expected": [
+          533.72,
+          -218.88,
+          -11381.94,
+          -41.01
+        ],
+        "actual": [
+          533.72,
+          -218.88,
+          -11381.94,
+          -41.01
+        ],
+        "passed": true
+      },
+      {
+        "id": 150,
+        "proposed_weekly_aud": 2100.73,
+        "historical_amount_aud": 24438.66,
+        "historical_period": "year",
+        "expected": [
+          469.97,
+          1630.76,
+          84799.3,
+          346.99
+        ],
+        "actual": [
+          469.97,
+          1630.76,
+          84799.3,
+          346.99
+        ],
+        "passed": true
+      },
+      {
+        "id": 151,
+        "proposed_weekly_aud": 747.69,
+        "historical_amount_aud": 1974.14,
+        "historical_period": "year",
+        "expected": [
+          37.96,
+          709.73,
+          36905.74,
+          1869.46
+        ],
+        "actual": [
+          37.96,
+          709.73,
+          36905.74,
+          1869.46
+        ],
+        "passed": true
+      },
+      {
+        "id": 152,
+        "proposed_weekly_aud": 202.62,
+        "historical_amount_aud": 7302.5,
+        "historical_period": "year",
+        "expected": [
+          140.43,
+          62.19,
+          3233.74,
+          44.28
+        ],
+        "actual": [
+          140.43,
+          62.19,
+          3233.74,
+          44.28
+        ],
+        "passed": true
+      },
+      {
+        "id": 153,
+        "proposed_weekly_aud": 594.98,
+        "historical_amount_aud": 14153.37,
+        "historical_period": "year",
+        "expected": [
+          272.18,
+          322.8,
+          16785.59,
+          118.6
+        ],
+        "actual": [
+          272.18,
+          322.8,
+          16785.59,
+          118.6
+        ],
+        "passed": true
+      },
+      {
+        "id": 154,
+        "proposed_weekly_aud": 1733.92,
+        "historical_amount_aud": 4741.23,
+        "historical_period": "year",
+        "expected": [
+          91.18,
+          1642.74,
+          85422.61,
+          1801.7
+        ],
+        "actual": [
+          91.18,
+          1642.74,
+          85422.61,
+          1801.7
+        ],
+        "passed": true
+      },
+      {
+        "id": 155,
+        "proposed_weekly_aud": 1123.19,
+        "historical_amount_aud": 2015.72,
+        "historical_period": "year",
+        "expected": [
+          38.76,
+          1084.43,
+          56390.16,
+          2797.52
+        ],
+        "actual": [
+          38.76,
+          1084.43,
+          56390.16,
+          2797.52
+        ],
+        "passed": true
+      },
+      {
+        "id": 156,
+        "proposed_weekly_aud": 2243.16,
+        "historical_amount_aud": 52557.26,
+        "historical_period": "year",
+        "expected": [
+          1010.72,
+          1232.44,
+          64087.06,
+          121.94
+        ],
+        "actual": [
+          1010.72,
+          1232.44,
+          64087.06,
+          121.94
+        ],
+        "passed": true
+      },
+      {
+        "id": 157,
+        "proposed_weekly_aud": 1494.13,
+        "historical_amount_aud": 24105.88,
+        "historical_period": "year",
+        "expected": [
+          463.57,
+          1030.56,
+          53588.88,
+          222.31
+        ],
+        "actual": [
+          463.57,
+          1030.56,
+          53588.88,
+          222.31
+        ],
+        "passed": true
+      },
+      {
+        "id": 158,
+        "proposed_weekly_aud": 933.79,
+        "historical_amount_aud": 13459.32,
+        "historical_period": "year",
+        "expected": [
+          258.83,
+          674.96,
+          35097.76,
+          260.77
+        ],
+        "actual": [
+          258.83,
+          674.96,
+          35097.76,
+          260.77
+        ],
+        "passed": true
+      },
+      {
+        "id": 159,
+        "proposed_weekly_aud": 787.18,
+        "historical_amount_aud": 13131.59,
+        "historical_period": "year",
+        "expected": [
+          252.53,
+          534.65,
+          27801.77,
+          211.72
+        ],
+        "actual": [
+          252.53,
+          534.65,
+          27801.77,
+          211.72
+        ],
+        "passed": true
+      },
+      {
+        "id": 160,
+        "proposed_weekly_aud": 1703.14,
+        "historical_amount_aud": 52356.0,
+        "historical_period": "year",
+        "expected": [
+          1006.85,
+          696.29,
+          36207.28,
+          69.16
+        ],
+        "actual": [
+          1006.85,
+          696.29,
+          36207.28,
+          69.16
+        ],
+        "passed": true
+      },
+      {
+        "id": 161,
+        "proposed_weekly_aud": 896.47,
+        "historical_amount_aud": 59719.7,
+        "historical_period": "year",
+        "expected": [
+          1148.46,
+          -251.99,
+          -13103.26,
+          -21.94
+        ],
+        "actual": [
+          1148.46,
+          -251.99,
+          -13103.26,
+          -21.94
+        ],
+        "passed": true
+      },
+      {
+        "id": 162,
+        "proposed_weekly_aud": 395.17,
+        "historical_amount_aud": 20193.23,
+        "historical_period": "year",
+        "expected": [
+          388.33,
+          6.84,
+          355.61,
+          1.76
+        ],
+        "actual": [
+          388.33,
+          6.84,
+          355.61,
+          1.76
+        ],
+        "passed": true
+      },
+      {
+        "id": 163,
+        "proposed_weekly_aud": 2234.22,
+        "historical_amount_aud": 20234.18,
+        "historical_period": "year",
+        "expected": [
+          389.12,
+          1845.1,
+          95945.26,
+          474.17
+        ],
+        "actual": [
+          389.12,
+          1845.1,
+          95945.26,
+          474.17
+        ],
+        "passed": true
+      },
+      {
+        "id": 164,
+        "proposed_weekly_aud": 1033.03,
+        "historical_amount_aud": 48245.08,
+        "historical_period": "year",
+        "expected": [
+          927.79,
+          105.24,
+          5472.48,
+          11.34
+        ],
+        "actual": [
+          927.79,
+          105.24,
+          5472.48,
+          11.34
+        ],
+        "passed": true
+      },
+      {
+        "id": 165,
+        "proposed_weekly_aud": 1309.74,
+        "historical_amount_aud": 54871.49,
+        "historical_period": "year",
+        "expected": [
+          1055.22,
+          254.52,
+          13234.99,
+          24.12
+        ],
+        "actual": [
+          1055.22,
+          254.52,
+          13234.99,
+          24.12
+        ],
+        "passed": true
+      }
+    ],
+    "input_guards": [
+      {
+        "name": "Missing historical period",
+        "expected": "needs_input",
+        "actual": "needs_input",
+        "passed": true
+      },
+      {
+        "name": "Missing proposed rent",
+        "expected": "needs_input",
+        "actual": "needs_input",
+        "passed": true
+      },
+      {
+        "name": "Both inputs missing",
+        "expected": "needs_input",
+        "actual": "needs_input",
+        "passed": true
+      },
+      {
+        "name": "Zero reference amount",
+        "expected": "unavailable",
+        "actual": "unavailable",
+        "passed": true
+      },
+      {
+        "name": "Missing reference amount",
+        "expected": "unavailable",
+        "actual": "unavailable",
+        "passed": true
+      },
+      {
+        "name": "String reference amount",
+        "expected": "unavailable",
+        "actual": "unavailable",
+        "passed": true
+      },
+      {
+        "name": "Non-rental listing",
+        "expected": "unavailable",
+        "actual": "unavailable",
+        "passed": true
+      },
+      {
+        "name": "No listing record",
+        "expected": "unavailable",
+        "actual": "unavailable",
+        "passed": true
+      },
+      {
+        "name": "Negative proposal",
+        "expected": "validation",
+        "actual": "validation",
+        "passed": true
+      },
+      {
+        "name": "Boolean proposal",
+        "expected": "validation",
+        "actual": "validation",
+        "passed": true
+      },
+      {
+        "name": "String proposal",
+        "expected": "validation",
+        "actual": "validation",
+        "passed": true
+      },
+      {
+        "name": "Unsupported period",
+        "expected": "validation",
+        "actual": "validation",
+        "passed": true
+      },
+      {
+        "name": "Expired deadline",
+        "expected": "timeout",
+        "actual": "timeout",
+        "passed": true
+      },
+      {
+        "name": "Version mismatch",
+        "expected": "version",
+        "actual": "version",
+        "passed": true
+      },
+      {
+        "name": "Arbitrary module path",
+        "expected": "validation",
+        "actual": "validation",
+        "passed": true
+      },
+      {
+        "name": "Caller-injected extra field",
+        "expected": "validation",
+        "actual": "validation",
+        "passed": true
+      }
+    ],
+    "wellbeing": [
+      {
+        "name": "Five dimensions",
+        "input": {
+          "area_name": "Synthetic audit suburb",
+          "area_level": "suburb",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 83
+            },
+            {
+              "key": "convenience",
+              "value": 67
+            },
+            {
+              "key": "family",
+              "value": 51
+            },
+            {
+              "key": "safety",
+              "value": 92
+            },
+            {
+              "key": "tranquility",
+              "value": 38
+            }
+          ]
+        },
+        "expected": {
+          "value": 66,
+          "available": 5
+        },
+        "actual": {
+          "value": 66,
+          "available": 5
+        },
+        "passed": true
+      },
+      {
+        "name": "Three dimensions including zero",
+        "input": {
+          "area_name": "Synthetic audit suburb",
+          "area_level": "suburb",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 0
+            },
+            {
+              "key": "convenience",
+              "value": 45
+            },
+            {
+              "key": "family",
+              "value": 90
+            },
+            {
+              "key": "safety",
+              "value": null
+            },
+            {
+              "key": "tranquility",
+              "value": null
+            }
+          ]
+        },
+        "expected": {
+          "value": 45,
+          "available": 3
+        },
+        "actual": {
+          "value": 45,
+          "available": 3
+        },
+        "passed": true
+      },
+      {
+        "name": "Two dimensions",
+        "input": {
+          "area_name": "Synthetic audit suburb",
+          "area_level": "suburb",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 21
+            },
+            {
+              "key": "convenience",
+              "value": 63
+            },
+            {
+              "key": "family",
+              "value": null
+            },
+            {
+              "key": "safety",
+              "value": null
+            },
+            {
+              "key": "tranquility",
+              "value": null
+            }
+          ]
+        },
+        "expected": {
+          "value": null,
+          "available": 2
+        },
+        "actual": {
+          "value": null,
+          "available": 2
+        },
+        "passed": true
+      },
+      {
+        "name": "Invalid range and string excluded",
+        "input": {
+          "area_name": "Synthetic audit suburb",
+          "area_level": "suburb",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 99
+            },
+            {
+              "key": "convenience",
+              "value": 34
+            },
+            {
+              "key": "family",
+              "value": -2
+            },
+            {
+              "key": "safety",
+              "value": 104
+            },
+            {
+              "key": "tranquility",
+              "value": "72"
+            }
+          ]
+        },
+        "expected": {
+          "value": null,
+          "available": 2
+        },
+        "actual": {
+          "value": null,
+          "available": 2
+        },
+        "passed": true
+      },
+      {
+        "name": "Final rounding only",
+        "input": {
+          "area_name": "Synthetic audit suburb",
+          "area_level": "suburb",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 12.49
+            },
+            {
+              "key": "convenience",
+              "value": 12.49
+            },
+            {
+              "key": "family",
+              "value": 13.49
+            }
+          ]
+        },
+        "expected": {
+          "value": 13,
+          "available": 3
+        },
+        "actual": {
+          "value": 13,
+          "available": 3
+        },
+        "passed": true
+      },
+      {
+        "name": "Address-level scope rejected",
+        "input": {
+          "area_name": "Synthetic audit suburb",
+          "area_level": "property",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 81
+            },
+            {
+              "key": "convenience",
+              "value": 73
+            },
+            {
+              "key": "family",
+              "value": 69
+            }
+          ]
+        },
+        "expected": {
+          "value": null,
+          "available": 3
+        },
+        "actual": {
+          "value": null,
+          "available": 3
+        },
+        "passed": true
+      },
+      {
+        "name": "Unnamed suburb rejected",
+        "input": {
+          "area_name": "",
+          "area_level": "suburb",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 81
+            },
+            {
+              "key": "convenience",
+              "value": 73
+            },
+            {
+              "key": "family",
+              "value": 69
+            }
+          ]
+        },
+        "expected": {
+          "value": null,
+          "available": 3
+        },
+        "actual": {
+          "value": null,
+          "available": 3
+        },
+        "passed": true
+      },
+      {
+        "name": "Duplicate dimension treated as ambiguous",
+        "input": {
+          "area_name": "Synthetic audit suburb",
+          "area_level": "suburb",
+          "scores": [
+            {
+              "key": "lifestyle",
+              "value": 22
+            },
+            {
+              "key": "convenience",
+              "value": 44
+            },
+            {
+              "key": "family",
+              "value": 66
+            },
+            {
+              "key": "lifestyle",
+              "value": 88
+            }
+          ]
+        },
+        "expected": {
+          "value": null,
+          "available": 2
+        },
+        "actual": {
+          "value": null,
+          "available": 2
+        },
+        "passed": true
+      }
+    ],
+    "semantic_evidence": [
+      {
+        "name": "Reference period borrowed from proposed-rent wording despite explicit monthly history",
+        "user_message": "Proposed rent is $694.23 per week. The historical listing amount is per month.",
+        "supplied_reference_period": "week",
+        "supplied_quote": "per week",
+        "expected": "rejected",
+        "observed": {
+          "status": "ok",
+          "metrics": [
+            2845.37,
+            -2151.14,
+            -111859.28,
+            -75.6
+          ]
+        },
+        "passed": false,
+        "scope": "Adversarial model-tool arguments; no live model or external API called."
+      }
+    ]
+  },
+  "local_csv_inventory": [
+    {
+      "file": "assets/addresses-city-of-sydney.csv",
+      "rows": 213239,
+      "fields": [
+        "gnaf_id",
+        "address",
+        "suburb",
+        "postcode",
+        "mb",
+        "latitude",
+        "longitude",
+        "register_type"
+      ],
+      "used_in_current_chat": false
+    },
+    {
+      "file": "assets/public-housing-homes-city-of-sydney.csv",
+      "rows": 6597,
+      "fields": [
+        "gnaf_pid",
+        "address",
+        "suburb",
+        "mb",
+        "lat",
+        "lon",
+        "confidence_score"
+      ],
+      "used_in_current_chat": false
+    }
+  ],
+  "limits": [
+    "No live Microburbs or OpenAI calls",
+    "No rental valuation or wellbeing ground-truth validation",
+    "No blinded independent evaluator",
+    "No production changes made in response to these results"
+  ]
+}

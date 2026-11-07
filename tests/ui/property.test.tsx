@@ -7,7 +7,7 @@ const reply = () => ({ ok: true, sections: { basics: { status: 'ok', data: { dwe
 let disposals: (() => void)[] = [];
 afterEach(() => { act(() => disposals.forEach(fn => fn())); disposals = []; document.body.replaceChildren(); vi.useRealTimers(); });
 function mount(handler: any) {
-  const send = vi.fn(handler); vi.stubGlobal('chrome', { runtime: { sendMessage: send } });
+  const send = vi.fn(handler); vi.stubGlobal('chrome', { runtime: { getURL: (path: string) => path, sendMessage: send } });
   const host = document.createElement('div'); document.body.append(host); const shadow = host.attachShadow({ mode: 'open' });
   const reposition = vi.fn(); let active: ReturnType<typeof attachPropertyLookup>;
   act(() => { active = attachPropertyLookup({ host, shadow, selection: { text: candidate.label }, isCurrent: () => host.isConnected, reposition }); });

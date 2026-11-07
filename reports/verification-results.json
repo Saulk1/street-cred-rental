@@ -1,0 +1,102 @@
+{
+  "generated_at": "2026-11-07T04:10:44.905752+00:00",
+  "checks": [
+    {
+      "name": "ui",
+      "command": [
+        "npm",
+        "run",
+        "test:ui",
+        "--",
+        "--reporter=json",
+        "--outputFile=/Users/william/microburbs_facts/.build/report-evaluation/ui.json"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "tests_passed": 58,
+      "tests_failed": 0,
+      "tests_skipped": 0
+    },
+    {
+      "name": "server",
+      "command": [
+        "npm",
+        "run",
+        "test:server",
+        "--",
+        "--reporter=json",
+        "--outputFile=/Users/william/microburbs_facts/.build/report-evaluation/server.json"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "tests_passed": 54,
+      "tests_failed": 0,
+      "tests_skipped": 2
+    },
+    {
+      "name": "python",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "*_test.py"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "tests_run": 24
+    },
+    {
+      "name": "javascript",
+      "command": [
+        "node",
+        "--test",
+        "tests/background.test.mjs",
+        "tests/content-script.test.mjs",
+        "tests/property-api.test.mjs",
+        "tests/report-plan.test.mjs",
+        "tests/report-worker.test.mjs",
+        "tests/selection-card.test.mjs"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "tests": 93,
+      "pass": 93,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "typecheck_server",
+      "command": [
+        "npm",
+        "run",
+        "typecheck:server"
+      ],
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "name": "build",
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "passed": true
+    }
+  ]
+}

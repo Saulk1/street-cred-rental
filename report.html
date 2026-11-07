@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Microburbs Facts: data, method, implementation results, limitations and a reproducible post-implementation synthetic check.">
+  <title>Data, method &amp; held-out check | Microburbs Facts</title>
+  <style>
+    :root { --ink: #172c46; --muted: #536174; --paper: #f4f5f2; --surface: #fff; --line: #d9e0e6; --accent: #164faa; --pass: #216247; --fail: #922c24; --warning: #fff4ec; --soft: #eaf0fa; }
+    * { box-sizing: border-box; }
+    html { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.65; color: var(--ink); background: var(--paper); }
+    body { margin: 0; }
+    a { color: var(--accent); text-underline-offset: .18em; }
+    a:hover { text-decoration-thickness: .13em; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .skip { position: absolute; inset-block-start: -5rem; inset-inline-start: 1rem; padding: .6rem 1rem; background: var(--surface); }
+    .skip:focus { inset-block-start: 1rem; }
+    .wrap { max-inline-size: 1080px; margin-inline: auto; padding-inline: clamp(1.2rem, 5vw, 3.5rem); }
+    .masthead { background: var(--ink); color: var(--surface); padding-block: 3rem 2.5rem; }
+    .eyebrow { margin: 0 0 1rem; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { max-inline-size: 17ch; margin: 0; font: 500 clamp(2.5rem, 6vw, 4rem)/1.09 Georgia, "Times New Roman", serif; letter-spacing: -.03em; }
+    .lead { max-inline-size: 69ch; margin-block: 1.4rem; font-size: 1.08rem; }
+    .metadata { margin: 0; font-size: .83rem; opacity: .86; }
+    nav { border-block-end: 1px solid var(--line); background: var(--surface); }
+    nav ul { display: flex; flex-wrap: wrap; gap: .35rem 1.5rem; margin: 0; padding-block: .9rem; list-style: none; }
+    nav a { display: inline-block; padding-block: .3rem; font-size: .88rem; font-weight: 600; }
+    main { padding-block: 2.5rem 4rem; }
+    section { margin-block-start: 3rem; scroll-margin-block-start: 1rem; }
+    h2 { margin: 0 0 1rem; font: 500 clamp(1.6rem, 3.5vw, 2rem)/1.2 Georgia, "Times New Roman", serif; letter-spacing: -.02em; }
+    h3 { margin-block: 1.6rem .5rem; font-size: 1rem; }
+    p { margin-block: .6rem 1rem; }
+    li { margin-block: .45rem; }
+    ul, ol { padding-inline-start: 1.35rem; }
+    code { font: .88em ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+    .note { color: var(--muted); font-size: .9rem; }
+    .finding { padding: 1.4rem 1.6rem; border: 1px solid #dcb7a5; border-inline-start: 5px solid var(--fail); background: var(--warning); border-radius: .45rem; }
+    .finding h2 { font: 700 1.05rem/1.4 system-ui, sans-serif; letter-spacing: 0; }
+    .finding p:last-child { margin-block-end: 0; }
+    .scoreboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1rem; margin-block: 1.4rem 0; }
+    .scoreboard > div { padding: 1.2rem; background: var(--surface); border: 1px solid var(--line); border-radius: .45rem; }
+    .scoreboard dt { font-size: .85rem; color: var(--muted); }
+    .scoreboard dd { margin: .25rem 0 0; font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .pass { color: var(--pass); font-weight: 650; }
+    .fail { color: var(--fail); font-weight: 700; }
+    .table-scroll { max-inline-size: 100%; max-block-size: 35rem; overflow: auto; container-type: inline-size; background: var(--surface); border: 1px solid var(--line); border-radius: .45rem; margin-block: 1.2rem; }
+    table { inline-size: 100%; min-inline-size: 43rem; border-collapse: separate; border-spacing: 0; font-size: .9rem; }
+    caption { text-align: start; padding: 1rem; font-weight: 700; color: var(--ink); }
+    th, td { text-align: start; vertical-align: top; padding: .9rem 1rem; border-block-start: 1px solid var(--line); }
+    thead { position: sticky; inset-block-start: 0; z-index: 2; background: var(--soft); }
+    thead th { font-size: .8rem; }
+    tbody th { position: sticky; inset-inline-start: 0; background: var(--surface); font-weight: 650; max-inline-size: 15rem; }
+    td.numeric { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    @container (width < 43rem) { table { font-size: .85rem; } th, td { padding: .75rem; } }
+    .formula { background: var(--ink); color: var(--surface); padding: 1.3rem; border-radius: .45rem; overflow: auto; line-height: 1.8; }
+    .formula code { overflow-wrap: normal; white-space: pre; }
+    .method { padding: .6rem 1.25rem .6rem 2.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: .45rem; }
+    .method li { padding-block: .35rem; }
+    blockquote { margin: 1.2rem 0; padding: .8rem 1.2rem; background: var(--surface); border-inline-start: 3px solid var(--accent); }
+    blockquote p { margin: 0; }
+    details { margin-block: 1.2rem; padding: 1rem 1.2rem; border: 1px solid var(--line); background: var(--surface); border-radius: .45rem; }
+    summary { cursor: pointer; font-weight: 650; }
+    .hashes dt { margin-block-start: .8rem; font-weight: 650; }
+    .hashes dd { margin-inline-start: 0; color: var(--muted); }
+    footer { border-block-start: 1px solid var(--line); padding-block: 1.7rem; background: var(--surface); font-size: .85rem; color: var(--muted); }
+    @media print { @page { size: A4; margin: 16mm; } html { background: white; font-size: 10pt; } .wrap { max-inline-size: none; padding-inline: 0; } .masthead { background: white; color: var(--ink); padding-block: 0 1rem; border-block-end: 2px solid var(--ink); } h1 { font-size: 32pt; } nav, .skip { display: none; } main { padding-block: 1rem; } section { margin-block-start: 1.6rem; } h2, h3, caption { break-after: avoid; } .finding, .scoreboard > div, blockquote { break-inside: avoid; } .table-scroll { max-block-size: none; overflow: visible; border-radius: 0; } table { min-inline-size: 0; font-size: 8pt; } thead, tbody th { position: static; } .formula { background: #f1f3f6; color: var(--ink); white-space: pre-wrap; } .formula code { white-space: pre-wrap; overflow-wrap: anywhere; } a { color: inherit; } footer { padding-block: 1rem 0; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to report</a>
+  <header class="masthead">
+    <div class="wrap">
+      <p class="eyebrow">Microburbs Facts · Street Cred · Technical report</p>
+      <h1>Data, method &amp; held-out check.</h1>
+      <p class="lead">A Chrome extension for property research, with a source-backed chatbot and a Python calculation layer. The implementation passes its regression suite. A separate challenge set found one unresolved gap in how quoted user inputs are bound to their meaning.</p>
+      <p class="metadata">7 November 2026 · Prototype evaluation · Base commit <code>946f29d</code> plus working-tree changes · No live market-data benchmark</p>
+    </div>
+  </header>
+  <nav aria-label="Report sections"><ul class="wrap">
+    <li><a href="#data">01 Data</a></li><li><a href="#method">02 Method</a></li><li><a href="#worked">03 What worked</a></li><li><a href="#limits">04 What did not</a></li><li><a href="#heldout">05 Held-out check</a></li><li><a href="#reproduce">06 Reproduce</a></li>
+  </ul></nav>
+  <main id="main" class="wrap" tabindex="-1">
+    <aside class="finding" aria-labelledby="finding-title">
+      <h2 id="finding-title">Main finding: correct arithmetic still needs correctly attributed inputs.</h2>
+      <p>The rent calculator matched an independent exact-arithmetic reference on <strong>165 of 165 fresh synthetic cases</strong>. However, an adversarial tool call could label a historical monthly amount as weekly by borrowing a valid quote about the proposed rent. The literal quote check accepted it.</p>
+      <p>The implication is narrow but material: the calculator is deterministic for the inputs it receives; the current quote validator does not establish that a quoted phrase describes the intended field. This report records the failure without changing application code to make the challenge pass.</p>
+    </aside>
+    <dl class="scoreboard">
+      <div><dt>Rent arithmetic challenge</dt><dd class="pass">165 / 165</dd></div>
+      <div><dt>Missing/invalid input guards</dt><dd class="pass">16 / 16</dd></div>
+      <div><dt>Semantic evidence challenge</dt><dd class="fail">0 / 1</dd></div>
+    </dl>
+
+    <section id="data">
+      <p class="eyebrow">01 / Data</p><h2>What enters the system.</h2>
+      <p>The intended users are renters comparing asking amounts and everyday amenities, and buyers inspecting estimates, sales, zoning and mapped context. The product combines three kinds of information: external property observations, explicit user responses and transparent derived values. It does not train a new valuation model.</p>
+      <div class="table-scroll" role="region" aria-labelledby="data-caption" tabindex="0"><table>
+        <caption id="data-caption">Data sources and their actual role</caption><thead><tr><th scope="col">Source</th><th scope="col">Information</th><th scope="col">Use and limitation</th></tr></thead><tbody>
+        <tr><th scope="row">Microburbs Hackathon API</th><td>Address candidates and GNAF IDs; property basics; automated valuation and interval; sale/rental history; comparables; zoning; schools, amenities and transport; overlays; suburb and regional context.</td><td>Live lookup source in the application, with City of Sydney coverage. The report worker's checked-in catalog describes 176 paths: 51 property, 107 suburb, 3 regional, 3 statistics and 12 support paths. Catalog coverage is not proof that every request returns data.</td></tr>
+        <tr><th scope="row">User responses</th><td>Proposed weekly rent, historical listing period and a short supporting quote linked to a user-message index.</td><td>Scenario parameters, not independently verified facts. The API does not supply a normalized rent period; the user must confirm it. Literal quote matching has the semantic limitation demonstrated below.</td></tr>
+        <tr><th scope="row">Suburb livability response</th><td>Lifestyle, convenience, family, safety and tranquility scores, each expected on a 0–100 scale.</td><td>Inputs to a prototype equal-weight suburb index. It describes aggregate context, not an individual home or a validated personal-wellbeing outcome.</td></tr>
+        <tr><th scope="row">Local CSV resources</th><td><code>addresses-city-of-sydney.csv</code>: 213,239 rows; <code>public-housing-homes-city-of-sydney.csv</code>: 6,597 rows.</td><td>Counted directly for this report, excluding headers. These are available repository resources, not current chatbot inputs or held-out observations. Counts are rows, not audited unique properties; duplicates, coverage and accuracy were not evaluated.</td></tr>
+        <tr><th scope="row">Optional Neon database</th><td>An <code>energy_reports</code> schema and a database-health endpoint.</td><td>Separate infrastructure. The current property chatbot and Python rent comparison do not query this dataset.</td></tr>
+        </tbody></table></div>
+      <p>Missing API values remain distinguishable from a real zero and a failed request. Historical asking amounts are dated observations; they are not signed lease prices or current rental estimates. Advertised sale prices and sold records must also remain distinct.</p>
+      <p class="note">Data boundaries: notes, saved reports and the conversation are stored in the Chrome profile. Chat text and requested property data are sent to the backend and OpenAI. Python receives only the calculation parameters and required normalized API fields. The evaluation below uses synthetic data and makes no live Microburbs or OpenAI requests.</p>
+    </section>
+
+    <section id="method">
+      <p class="eyebrow">02 / Method</p><h2>Retrieve, clarify, calculate, explain.</h2>
+      <ol class="method">
+        <li><strong>Confirm the address.</strong> A page selection produces address candidates. The user confirms the intended match before the popup's report is started. The chat separately searches addresses each turn and asks for clarification when a match is ambiguous.</li>
+        <li><strong>Retrieve the relevant data.</strong> The extension worker saves full report envelopes for Rental/Buy views. The Node chat backend uses its own smaller, allowlisted property client. The chatbot does not automatically receive the popup's saved report or notes.</li>
+        <li><strong>Collect scenario inputs.</strong> A named calculation tool declares required fields, units, ranges and enum choices. Missing fields produce <code>needs_input</code>. The server checks that each supplied quote appears in a user message and literally supports a number or recognized period term.</li>
+        <li><strong>Run reviewed Python.</strong> The server fetches the calculator's declared API record itself, then calls an authenticated Python endpoint. A static registry maps the calculator name to a checked-in module. Tool arguments cannot name an arbitrary URL, file path or executable script.</li>
+        <li><strong>Preserve the result and provenance.</strong> A calculation record includes metrics, units, exact inputs, API source IDs and timestamps, assumptions and module version. The chatbot explains the output; expandable details survive reopening the conversation.</li>
+      </ol>
+      <h3>Rent comparison, version 1.0.0</h3>
+      <p>Let <var>P</var> be the proposed weekly amount in AUD, <var>H</var> the historical listing amount and <var>N</var> its confirmed periods per year: 52 for a week, 26 for a fortnight, 12 for a month or 1 for a year.</p>
+      <pre class="formula" tabindex="0" aria-label="Rent comparison formula"><code>Historical weekly reference = H × N ÷ 52
+Weekly difference           = P − historical weekly reference
+Annual difference           = 52 × P − H × N
+Percentage difference       = 100 × (52 × P − H × N) ÷ (H × N)</code></pre>
+      <p>The Python implementation uses decimal arithmetic and rounds each final metric to two decimals using half-up rounding. It retains precision through the calculation, so an annual difference is not obtained by multiplying an already rounded weekly display by 52. Nonpositive or invalid reference prices cannot become a percentage denominator.</p>
+      <h3>Suburb index</h3>
+      <p>The popup averages the available five livability dimensions and rounds the final mean once. It requires a named suburb-level response and at least three valid, unique dimensions. Non-finite values, values outside 0–100 and duplicated dimensions are excluded; a legitimate zero is retained. The choice of equal weights is an explicit prototype rule, not a learned or independently validated weighting scheme.</p>
+      <h3>Bounded execution</h3>
+      <p>Chat keeps a 55-second overall deadline, four model rounds and six tool executions. Python calls allow up to eight seconds, reserve time for the final explanation and accept bounded JSON responses. The deployed Python function is configured for a ten-second maximum. Stop aborts the HTTP request; remote CPU work also needs its own deadline checks. Some chat list datasets are capped at 50 records, so future aggregate calculators need complete-data adapters before using those arrays.</p>
+    </section>
+
+    <section id="worked">
+      <p class="eyebrow">03 / What worked</p><h2>Implementation checks passed.</h2>
+      <p>The existing automated suites were rerun for this report. They passed <strong>229 tests</strong>; two opt-in database integration tests were skipped. Client/server type checks and the extension build also passed. These are engineering checks with mocked upstream services, not evidence of market accuracy or improved user decisions.</p>
+      <div class="table-scroll" role="region" aria-labelledby="verification-caption" tabindex="0"><table>
+        <caption id="verification-caption">Fresh regression and build results</caption><thead><tr><th scope="col">Check</th><th scope="col">Observed result</th><th scope="col">What it supports</th></tr></thead><tbody>
+        <tr><th scope="row">React UI tests</th><td class="pass">58 passed</td><td>Chat interaction, streamed-event validation, result disclosure and saved-thread compatibility; property UI behavior under fixtures.</td></tr>
+        <tr><th scope="row">Server tests</th><td><span class="pass">54 passed</span>; 2 skipped</td><td>Tool orchestration, property search guards, safe failures, cancellation and real Python execution against dummy API data. Database integration was not exercised.</td></tr>
+        <tr><th scope="row">Python tests</th><td class="pass">24 passed</td><td>Numerical behavior, period conversion, invalid/missing inputs, endpoint authentication and extension-package exclusions.</td></tr>
+        <tr><th scope="row">Core JavaScript tests</th><td class="pass">93 passed</td><td>Worker messages, report planning/recovery, API behavior and selection-controller lifecycle.</td></tr>
+        <tr><th scope="row">Type checking and build</th><td class="pass">All three commands passed</td><td>Client TypeScript, server TypeScript and bundled extension assets build successfully.</td></tr>
+        </tbody></table></div>
+      <p>A separate local HTTP smoke test during implementation also exercised the actual Python handler with dummy data: a historical monthly amount was converted before comparison. No external service was contacted. The new challenge set below extends this evidence with fresh amounts and a different arithmetic reference.</p>
+      <p>At the code level, useful behavior includes retaining partial API successes, persisting reports across popup closures, preserving the existing notepad, exposing calculation assumptions and keeping compute credentials and Python sources outside the extension's runtime package.</p>
+    </section>
+
+    <section id="limits">
+      <p class="eyebrow">04 / What did not work, or remains unproved</p><h2>The boundaries are part of the result.</h2>
+      <ul>
+        <li><strong>Semantic input binding failed one targeted challenge.</strong> A valid phrase about the proposed rent can be misapplied to the historical period. The quote validator checks literal support; it does not prove the phrase describes the intended variable. The concrete consequence is shown below.</li>
+        <li><strong>The rental feed does not establish the historical amount's period.</strong> A weekly label cannot be safely inferred from a plausible-looking amount. The tool asks for clarification, but correct attribution of the answer still matters.</li>
+        <li><strong>The wellbeing score is an unvalidated proxy.</strong> Its average is transparent and its missing-data behavior is tested. No study here establishes that equal weighting measures wellbeing, predicts house prices or reflects a particular user's priorities.</li>
+        <li><strong>Some mockup features lack supporting data or behavior.</strong> Noise ratings, greenery measurements and nearby development applications are not invented when absent. Social links do not verify follows or unlock a free report. Sharing currently copies the confirmed address.</li>
+        <li><strong>Live service quality was not measured in this evaluation.</strong> There is no accuracy/latency benchmark for address matching, valuation, API completeness, live model answers or the deployed Python route. This report does not establish that hosted compute has been configured and deployed.</li>
+        <li><strong>Visual verification remains limited.</strong> A manual browser attempt during compute implementation was blocked by a browser capture failure. The chat disclosure is covered by DOM and keyboard tests; that does not substitute for a completed visual or assistive-technology review.</li>
+        <li><strong>User benefit is still a product hypothesis.</strong> No controlled usability study, conversion measurement or comparison with an unaided research task was run.</li>
+      </ul>
+    </section>
+
+    <section id="heldout">
+      <p class="eyebrow">05 / My held-out check</p><h2>A fresh challenge after implementation.</h2>
+      <p>I created the challenge after the calculation code existed and kept the evaluated application files unchanged while running it. The set is separate from existing unit-test fixtures. It is a <strong>post-implementation synthetic challenge</strong>, not a blinded independent assessment or a held-out sample of real property outcomes: the evaluator also helped implement the code.</p>
+      <p>The arithmetic reference uses exact rational numbers and integer quotient/remainder rounding. It annualizes first and does not import the production calculator or Python's <code>Decimal</code> for its expected values. A fixed seed, <code>202611071507</code>, generates 40 new cases for each of the four periods. Five additional fixed cases cover fresh fractional amounts, a zero proposal and half-cent rounding.</p>
+      <div class="table-scroll" role="region" aria-labelledby="heldout-caption" tabindex="0"><table>
+        <caption id="heldout-caption">Challenge-set outcomes — separate from the regression suite</caption><thead><tr><th scope="col">Category</th><th scope="col">Result</th><th scope="col">Interpretation</th></tr></thead><tbody>
+        <tr><th scope="row">Rent arithmetic</th><td class="pass">165 / 165 matched</td><td>All four metrics matched the independent reference at the specified two-decimal output precision.</td></tr>
+        <tr><th scope="row">Required fields and rejection behavior</th><td class="pass">16 / 16 matched</td><td>Missing fields prompted input; invalid references stayed unavailable; malformed values, unsupported periods, expired deadlines and unregistered modules were rejected.</td></tr>
+        <tr><th scope="row">Wellbeing handling</th><td class="pass">8 / 8 matched</td><td>Fresh dimension sets checked thresholds, real zero, duplicates, scope, invalid values and final-only rounding.</td></tr>
+        <tr><th scope="row">Semantic attribution</th><td class="fail">0 / 1 matched the intended rejection</td><td>The adapter accepted the wrong historical period when the quoted phrase literally appeared in a user message.</td></tr>
+        </tbody></table></div>
+      <h3>Representative numerical cases</h3>
+      <p>All amounts below are synthetic AUD values. Expected and observed outputs matched in each row. The final column is a comparison with the historical amount, not a prediction of fair rent.</p>
+      <div class="table-scroll" role="region" aria-labelledby="examples-caption" tabindex="0"><table>
+        <caption id="examples-caption">New examples from the challenge set</caption><thead><tr><th scope="col">Historical amount / period</th><th scope="col">Proposed / week</th><th scope="col">Reference / week</th><th scope="col">Weekly difference</th><th scope="col">Annual difference</th><th scope="col">Difference</th></tr></thead><tbody>
+        <tr><th scope="row">$2,845.37 / month</th><td class="numeric">$694.23</td><td class="numeric">$656.62</td><td class="numeric">+$37.61</td><td class="numeric">+$1,955.52</td><td class="numeric">+5.73%</td></tr>
+        <tr><th scope="row">$1,260.79 / fortnight</th><td class="numeric">$487.65</td><td class="numeric">$630.40</td><td class="numeric">−$142.75</td><td class="numeric">−$7,422.74</td><td class="numeric">−22.64%</td></tr>
+        <tr><th scope="row">$42,187.63 / year</th><td class="numeric">$831.04</td><td class="numeric">$811.30</td><td class="numeric">+$19.74</td><td class="numeric">+$1,026.45</td><td class="numeric">+2.43%</td></tr>
+        <tr><th scope="row">$913.27 / week</th><td class="numeric">$0.00</td><td class="numeric">$913.27</td><td class="numeric">−$913.27</td><td class="numeric">−$47,490.04</td><td class="numeric">−100.00%</td></tr>
+        </tbody></table></div>
+      <h3>The failing semantic challenge</h3>
+      <blockquote><p>“Proposed rent is $694.23 per week. The historical listing amount is per month.”</p></blockquote>
+      <p>I supplied an adversarial tool argument with <code>reference_period = "week"</code>, backed by the exact quote <code>"per week"</code>. That phrase belongs to the proposal, not the historical listing. The expected behavior was rejection. The observed behavior was acceptance and a completed calculation.</p>
+      <p>With a synthetic historical amount of $2,845.37, this produced a <strong class="fail">−$2,151.14 weekly difference</strong> rather than the correct <strong>+$37.61</strong> using the explicitly stated monthly period. The direction of the comparison reversed. This is a controlled adversarial tool-call test; it is not an observed failure rate of a live model.</p>
+      <p><strong>Next correction:</strong> bind each confirmed value to its specific field and property in structured scenario state, display that interpretation to the user, and reject conflicts with an explicit reference-period response. Add this challenge as a regression case when implementing that change. Prompt instructions alone should not be presented as a semantic validation guarantee.</p>
+      <p class="note">Result summary: 189 challenge cases met their expected behavior; one semantic-attribution case did not. These cases measure different properties, so combining them into a single “accuracy” percentage would be misleading.</p>
+    </section>
+
+    <section id="reproduce">
+      <p class="eyebrow">06 / Reproduce and inspect</p><h2>Keep the evidence close to the claim.</h2>
+      <p>Run from the repository root with Node.js 22.12+ within 22.x and Python 3.12. Install the pinned JavaScript dependencies, then run the report's separate challenge. It uses dummy data, needs no service credentials and writes the detailed evidence file.</p>
+      <pre class="formula" tabindex="0" aria-label="Reproduce the challenge"><code>npm ci
+python3 scripts/heldout-check.py</code></pre>
+      <p>The script does not patch production code. Its exit status signals that the evaluation harness completed; inspect the per-category results to see product failures. The intentionally failing semantic expectation is preserved in the JSON rather than hidden behind a successful harness run. Re-running the script refreshes evidence, not this dated HTML snapshot.</p>
+      <ul>
+        <li><a href="reports/heldout-check.json">Complete challenge inputs, expected/actual outputs, seed and source fingerprints</a>.</li>
+        <li><a href="reports/verification-results.json">Fresh regression, type-check and build results</a>.</li>
+        <li><a href="scripts/heldout-check.py">Reproducible challenge runner and independent rational oracle</a>.</li>
+        <li><a href="compute/calculators/rent_comparison.py">Rent calculation module</a>, <a href="server/compute.ts">server input/response validation</a> and <a href="src/lib/wellbeing.ts">wellbeing calculation</a>.</li>
+        <li><a href="docs/property-compute.md">Compute contracts and deployment setup</a>, <a href="docs/property-report.md">report coverage and lifecycle</a>, and <a href="README.md">installation instructions</a>.</li>
+      </ul>
+      <details><summary>Evaluated source fingerprints</summary>
+        <p class="note">Challenge run: <time datetime="2026-11-07T04:09:57Z">7 November 2026, 04:09 UTC</time>. The base commit is <code>946f29d</code>; uncommitted changes are part of this evaluation. These SHA-256 hashes identify the actual evaluated files, and all five remained unchanged during the challenge.</p>
+        <dl class="hashes">
+          <dt><code>compute/catalog.json</code></dt><dd><code>cadd47f74e21f7484e1bfe9d940d2e9891af5f940b53bf4abf336348becbb261</code></dd>
+          <dt><code>compute/registry.py</code></dt><dd><code>ca1bed6327d047decb218f71c171cd5bc1d9aa91e7d10291222a1c8a016d4c6f</code></dd>
+          <dt><code>compute/calculators/rent_comparison.py</code></dt><dd><code>3ea2047ba0c21540700789247ca2971b97f38b4fde4599f9c6cace9dc40abc85</code></dd>
+          <dt><code>server/compute.ts</code></dt><dd><code>269d6d6c22bd71b3feb3c99df0d29baacef088badf45be93c445b4bfcf451358</code></dd>
+          <dt><code>src/lib/wellbeing.ts</code></dt><dd><code>554c83a3776865125634a9993055d0f922367f62da0f3714181e7dd7c81025b9</code></dd>
+        </dl>
+      </details>
+    </section>
+  </main>
+  <footer><div class="wrap">Prepared from the working codebase and executed checks on 7 November 2026. Synthetic correctness checks support implementation claims; they do not establish property-value accuracy, causal effects or real-world user benefit. This document works offline without JavaScript or external assets.</div></footer>
+</body>
+</html>

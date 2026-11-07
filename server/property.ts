@@ -63,7 +63,9 @@ export function propertyClient(settings: ReturnType<typeof propertySettings>, si
   let retryAt = 0;
   let sequence = 0;
   const known = new Set<string>();
+  const cache = new Map<string, unknown>();
   async function request(path: string, label: string, section: string) {
+    if (cache.has(path)) return cache.get(path) as { source: ChatSource; status: string; data: any; retrievedAt: string };
     if (Date.now() < retryAt) throw new PropertyError('rate_limit', 'Microburbs is rate limiting requests. Please wait before retrying.');
     if (next > Date.now()) await delay(next - Date.now(), undefined, { signal });
     next = Date.now() + 125;
@@ -93,7 +95,9 @@ export function propertyClient(settings: ReturnType<typeof propertySettings>, si
     const reference = { id: `S${++sequence}`, label, path };
     source(reference);
     if (section === 'search' && Array.isArray(data)) for (const row of data) known.add(row.id as string);
-    return { source: reference, status: data === null ? 'empty' : 'ok', data };
+    const result = { source: reference, status: data === null ? 'empty' : 'ok', data, retrievedAt: new Date().toISOString() };
+    cache.set(path, result);
+    return result;
   }
   return async (name: string, args: Record<string, unknown>) => {
     if (name === 'search_address') {

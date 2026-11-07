@@ -3,7 +3,7 @@
 // Main-world UI preview only. The real extension uses its isolated-world worker.
 // Invented observations with field shapes from the bundled hackathon YAML.
 const sectionFixtures = fetch('property-sections.json').then(response => response.json());
-chrome.runtime = { async sendMessage(message) {
+chrome.runtime = { getURL: path => new URL('../../' + path, location.href).href, async sendMessage(message) {
   const scenario = document.getElementById("scenario").value;
   if (message.type === "SEARCH_ADDRESS") return { ok: true, candidates: scenario === "empty" ? [] : [
     { id: "GANSW705970502", label: "26 Tudor Street, Surry Hills (mock)" },
@@ -37,8 +37,10 @@ chrome.runtime = { async sendMessage(message) {
 } };
 
 let active;
+let saveActive;
 document.getElementById("preview").addEventListener("click", async () => {
   active?.dispose();
+  saveActive?.dispose();
   document.getElementById("microburbs-facts-selection-card")?.remove();
   const host = document.createElement("div");
   host.id = "microburbs-facts-selection-card";
@@ -49,6 +51,8 @@ document.getElementById("preview").addEventListener("click", async () => {
   document.documentElement.append(host);
   host.style.left = "16px";
   host.style.top = `${Math.min(180, window.innerHeight * 0.1)}px`;
+  saveActive = MicroburbsUI.mountSaveAction(shadow);
+  saveActive.button.addEventListener('click', () => saveActive.update({ saved: true, disabled: true, message: 'Example note saved.' }));
   active = PROPERTY_LOOKUP.attach({ host, shadow, selection: { text: "26 Tudor Street, Surry Hills" },
     isCurrent: () => host.isConnected, reposition() {} });
 });

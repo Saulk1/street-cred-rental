@@ -42,6 +42,8 @@ class PackageTests(unittest.TestCase):
                 'CHAT_ACCESS_TOKEN=dummy-chat-secret\n'
                 'OPENAI_API_KEY=dummy-openai-secret\n'
                 'OPENAI_MODEL=server-only-model\n'
+                'COMPUTE_API_URL=https://compute-private.example.test/api/compute\n'
+                'COMPUTE_SERVICE_TOKEN=dummy-compute-secret\n'
                 'DATABASE_URL=postgresql://dummy-database-secret\n')
             for public in [False, True]:
                 manifest, contents, archive = pack.build(root, public_build=public)
@@ -49,10 +51,11 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(chat, {'baseUrl': 'https://chat.example.test', 'token': '' if public else 'dummy-chat-secret'})
                 self.assertIn(b'../runtime-config.js', contents['options/options.html'])
                 for data in contents.values():
-                    for secret in [b'dummy-openai-secret', b'server-only-model', b'dummy-database-secret']:
+                    for secret in [b'dummy-openai-secret', b'server-only-model', b'dummy-database-secret', b'dummy-compute-secret', b'compute-private.example.test']:
                         self.assertNotIn(secret, data)
                     if public:
                         self.assertNotIn(b'dummy-chat-secret', data)
+                self.assertFalse(any(name.endswith('.py') or name.startswith('compute/') for name in contents))
                 with redirect_stdout(io.StringIO()):
                     verify.verify(root, manifest, contents, archive, public_build=public)
                 chat['baseUrl'] = 'https://other.example.test'

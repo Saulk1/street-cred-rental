@@ -1,9 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { ChevronDownIcon } from 'lucide-react';
 import { flushSync } from 'react-dom';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { ResourceContent, Rows, absent, displayValue, money, distance, type Resource } from '@/components/property-feedback';
 import type { ExtraData, ExtraKey, ExtraResponse, MarketResponse, MarketRecord, MarketPart, Planning, School, Amenities, Transport, TransportMode } from '@/types';
 
@@ -33,10 +30,10 @@ function PlanningView({ data }: { data: Planning }) {
 }
 function SchoolView({ data }: { data: School[] }) {
   const [limit, setLimit] = useState(5);
-  if (!data.length) return <Empty><EmptyHeader><EmptyTitle>No nearby schools returned</EmptyTitle></EmptyHeader></Empty>;
+  if (!data.length) return <p className="selection-empty">No nearby schools returned</p>;
   return <div className="extra-stack"><p className="fine-print">Showing {Math.min(limit, data.length)} of {data.length} returned schools within approximately 5 km. Distances are straight-line. Nearby schools do not establish catchment eligibility.</p>
     <ul className="extra-list">{data.slice(0, limit).map((school, index) => <li key={`${school.id}-${index}`}><strong>{school.name ?? 'Unnamed school'}</strong><p>{displayValue(school.school_level_type)} · {displayValue(school.sector)} · {distance(school.distance_m)}</p></li>)}</ul>
-    {data.length > limit && <Button variant="outline" onClick={() => setLimit(data.length)}>Show more schools</Button>}
+    {data.length > limit && <button type="button" className="selection-button" onClick={() => setLimit(data.length)}>Show more schools</button>}
   </div>;
 }
 function AmenitiesView({ data }: { data: Amenities }) {
@@ -51,10 +48,10 @@ function AmenitiesView({ data }: { data: Amenities }) {
     {categories.map(({ category, label, key }) => {
       const rows = data.results.filter(row => row.category === category);
       const limit = expanded.includes(key) ? rows.length : 5;
-      return <section key={key} className="extra-stack"><h4>{label} <Badge variant="secondary">Total: {displayValue(data.counts[key])}</Badge></h4>
+      return <section key={key} className="extra-stack"><h4>{label} <span className="selection-badge">Total: {displayValue(data.counts[key])}</span></h4>
         <p className="fine-print">Showing {Math.min(limit, rows.length)} of {rows.length} returned results.</p>
         {!rows.length ? <p>No results returned in this category.</p> : <ul className="extra-list">{rows.slice(0, limit).map((row, i) => <li key={i}><strong>{row.name ?? 'Unnamed amenity'}</strong><span>{distance(row.distance_m)}</span></li>)}</ul>}
-        {rows.length > limit && <Button variant="outline" onClick={() => setExpanded(current => [...current, key])}>Show more {label.toLowerCase()}</Button>}
+        {rows.length > limit && <button type="button" className="selection-button" onClick={() => setExpanded(current => [...current, key])}>Show more {label.toLowerCase()}</button>}
       </section>;
     })}
   </div>;
@@ -64,7 +61,7 @@ function TransportView({ data }: { data: Transport }) {
   return <div className="extra-stack"><p className="fine-print">Search radius: {distance(data.radius_m)}. Distances are straight-line, not walking routes.</p>
     <ul className="extra-list">{modes.map(([key, label]) => {
       const stop = data.nearest[key];
-      return <li key={key}><h4>{label} <Badge variant="secondary">Stops: {displayValue(data.counts[key])}</Badge></h4>
+      return <li key={key}><h4>{label} <span className="selection-badge">Stops: {displayValue(data.counts[key])}</span></h4>
         {stop ? <p>{stop.name ?? stop.label ?? `${label} stop`} · {distance(stop.distance_m)}</p> : <p>{data.counts[key] === 0 ? 'No stops within the search radius.' : 'Nearest stop not available.'}</p>}
       </li>;
     })}</ul>
@@ -77,6 +74,7 @@ const titles: Record<ExtraKey, string> = { market: 'Latest market activity', pla
 
 export function PropertyExtras({ id, risks, reposition }: { id: string; risks: React.ReactNode; reposition: () => void }) {
   const [open, setOpen] = useState<string[]>([]);
+  const controlsId = useId();
   const [resources, setResources] = useState(initialResources);
   const current = useRef(resources);
   const active = useRef(true);
@@ -122,16 +120,15 @@ export function PropertyExtras({ id, risks, reposition }: { id: string; risks: R
     if (key === 'amenities') return <ResourceContent resource={resources.amenities} retry={() => void load(key)}>{data => <AmenitiesView data={data} />}</ResourceContent>;
     return <ResourceContent resource={resources.transport} retry={() => void load(key)}>{data => <TransportView data={data} />}</ResourceContent>;
   }
-  return <Accordion type="multiple" value={open} onValueChange={change} className="property-extras">
+  return <div className="property-extras">
     {(['risks', ...Object.keys(titles)] as const).map(key => {
       const loaded = key === 'risks' || (key === 'market' ? resources.market.sale.status !== 'idle' : resources[key as keyof ExtraData].status !== 'idle');
       const expanded = open.includes(key);
       // React treats hidden as a boolean, so set until-found through the DOM.
       // Chrome 116 supports it; keep loaded content mounted for native Find.
-      return <AccordionItem key={key} value={key}>
-        <AccordionTrigger>{key === 'risks' ? 'Overlays and nearby features' : titles[key as ExtraKey]}</AccordionTrigger>
-        <AccordionContent forceMount hidden={false} className="p-0">
-          <div hidden={!expanded} ref={node => {
+      return <section key={key} className="property-extra">
+        <h3><button type="button" className="property-extra-trigger" aria-expanded={expanded} aria-controls={`${controlsId}-${key}`} onClick={() => change(expanded ? open.filter(item => item !== key) : [...open, key])}>{key === 'risks' ? 'Overlays and nearby features' : titles[key as ExtraKey]}<ChevronDownIcon aria-hidden="true" /></button></h3>
+          <div id={`${controlsId}-${key}`} hidden={!expanded} ref={node => {
             if (!node) return;
             if (!expanded && canFind && loaded) node.setAttribute('hidden', 'until-found');
             const reveal = () => { if (!expanded) flushSync(() => change([...open, key])); };
@@ -140,8 +137,7 @@ export function PropertyExtras({ id, risks, reposition }: { id: string; risks: R
           }}>
             <div className="extra-content">{key === 'risks' ? risks : loaded ? content(key as ExtraKey) : null}</div>
           </div>
-        </AccordionContent>
-      </AccordionItem>;
+      </section>;
     })}
-  </Accordion>;
+  </div>;
 }

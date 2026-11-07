@@ -1,8 +1,42 @@
 // Background service worker for the Microburbs Facts extension.
 importScripts("consts.js");
 // The source placeholder is replaced with generated config in dist/unpacked.
-try { importScripts("runtime-config.js"); } catch { /* API reports a configuration error on lookup. */ }
+try { importScripts("runtime-config.js"); } catch {
+  // Keep note saving available; lookup reports this without exposing the exception.
+  globalThis.MICROBURBS_CONFIG_LOAD_FAILED = true;
+}
 importScripts("property-api.js");
+importScripts("report-endpoints.js");
+importScripts("report-plan.js");
+importScripts("report-store.js");
+importScripts("report-worker.js");
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const types = ['CONFIRM_PROPERTY', 'REPORT_READ', 'REPORT_RESULT', 'REPORT_REFRESH', 'REPORT_RETRY', 'REPORT_CONTINUE'];
+  if (!types.includes(message?.type)) return;
+  const card = sender.id === chrome.runtime.id && sender.frameId === 0 && Number.isInteger(sender.tab?.id) && /^https?:\/\//.test(sender.url ?? '');
+  const popup = sender.id === chrome.runtime.id && sender.url === chrome.runtime.getURL('popup/popup.html');
+  if (message.type === 'CONFIRM_PROPERTY' ? !card : !popup) { sendResponse({ ok: false }); return; }
+  const candidate = message.candidate;
+  if (message.type === 'CONFIRM_PROPERTY' && (!candidate || typeof candidate.id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(candidate.id)
+    || typeof candidate.label !== 'string' || !candidate.label.trim() || candidate.label.length > 500 || /[\x00-\x1f\x7f]/.test(candidate.label))) {
+    sendResponse({ ok: false }); return;
+  }
+  if (['REPORT_RESULT', 'REPORT_RETRY'].includes(message.type) && (typeof message.reportId !== 'string' || message.reportId.length > 80
+    || typeof message.taskId !== 'string' || message.taskId.length > 5000)) { sendResponse({ ok: false }); return; }
+  const operation = async () => {
+    if (message.type === 'CONFIRM_PROPERTY') return PROPERTY_REPORT.confirm({ id: candidate.id, label: candidate.label });
+    if (message.type === 'REPORT_READ') return PROPERTY_REPORT.read();
+    if (message.type === 'REPORT_RESULT') return PROPERTY_REPORT.result(message.reportId, message.taskId);
+    if (message.type === 'REPORT_RETRY') return PROPERTY_REPORT.retry(message.reportId, message.taskId);
+    if (message.type === 'REPORT_CONTINUE') { await PROPERTY_REPORT.pump(); return { ok: true }; }
+    const current = await PROPERTY_REPORT.read();
+    if (!current.report || current.report.id !== message.reportId) return { ok: false };
+    return PROPERTY_REPORT.confirm(current.report.candidate, true);
+  };
+  operation().then(sendResponse, () => sendResponse({ ok: false, error: { message: 'Could not save or load the property report. Check API configuration and local storage, then retry.' } }));
+  return true;
+});
 
 async function saveNote(text, type) {
   const id = crypto.randomUUID();

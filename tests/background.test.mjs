@@ -8,6 +8,7 @@ import { note, noteKey, storageMock } from "./helpers/storage.mjs";
 const source = await readFile(new URL("../background.js", import.meta.url), "utf8");
 const consts = await readFile(new URL("../consts.js", import.meta.url), "utf8");
 const apiSource = await readFile(new URL("../property-api.js", import.meta.url), "utf8");
+const reportScripts = Object.fromEntries(await Promise.all(['report-endpoints.js', 'report-plan.js', 'report-store.js', 'report-worker.js'].map(async name => [name, await readFile(new URL('../' + name, import.meta.url), 'utf8')])));
 const welcomeURL = "chrome-extension://test-extension/welcome/welcome.html";
 
 function background(createTab = async () => ({ id: 1 }), store = storageMock(), menuFailure) {
@@ -60,11 +61,14 @@ function background(createTab = async () => ({ id: 1 }), store = storageMock(), 
   context.importScripts = path => {
     if (path === "consts.js") vm.runInContext(consts, context);
     else if (path === "property-api.js") vm.runInContext(apiSource, context);
+    else if (reportScripts[path]) vm.runInContext(reportScripts[path], context);
     else throw new Error("Missing generated configuration");
   };
   vm.runInContext(source, context);
-  return { listeners, calls, paths, errors, menus, clickListeners, store, chrome, tabMessages,
-    message: (message, sender, respond) => messageListeners[0](message, sender, respond),
+  return { listeners, calls, paths, errors, menus, clickListeners, store, chrome, tabMessages, context,
+    message: (message, sender, respond) => {
+      for (const listener of messageListeners) { const result = listener(message, sender, respond); if (result !== undefined) return result; }
+    },
     click: (info, tab) => clickListeners[0](info, tab),
     install: reason => Promise.all(listeners.map(listener => listener({ reason }))) };
 }
@@ -76,6 +80,32 @@ test("worker startup registers the install listener without opening a tab", () =
   assert.equal(app.menus.size, 0);
   assert.deepEqual(app.calls, []);
   assert.deepEqual(app.paths, []);
+  assert.equal(app.context.MICROBURBS_CONFIG_LOAD_FAILED, true);
+});
+
+test('report messages restrict confirmation to top-frame pages and reading to the exact popup', async () => {
+  const app = background();
+  const calls = [];
+  app.context.PROPERTY_REPORT = {
+    confirm: async candidate => { calls.push(candidate); return { ok: true }; },
+    read: async () => ({ ok: true, report: null }),
+  };
+  const sender = { id: 'test-extension', frameId: 0, tab: { id: 7 }, url: 'https://example.com' };
+  const candidate = { id: 'GANSW1', label: '26 Example St' };
+  const invoke = (message, source) => new Promise(resolve => app.message(message, source, resolve));
+  assert.equal((await invoke({ type: 'CONFIRM_PROPERTY', candidate }, sender)).ok, true);
+  assert.equal(calls.length, 1);
+  for (const source of [{ ...sender, frameId: 2 }, { ...sender, id: 'other-extension' }, { ...sender, url: 'file:///private' }]) {
+    assert.equal((await invoke({ type: 'CONFIRM_PROPERTY', candidate }, source)).ok, false);
+  }
+  for (const invalid of [{ ...candidate, id: '../escape' }, { ...candidate, label: '' }, { ...candidate, label: 'a'.repeat(501) }]) {
+    assert.equal((await invoke({ type: 'CONFIRM_PROPERTY', candidate: invalid }, sender)).ok, false);
+  }
+  assert.equal((await invoke({ type: 'REPORT_READ' }, sender)).ok, false);
+  assert.equal((await invoke({ type: 'REPORT_READ' }, { id: 'test-extension', url: 'chrome-extension://test-extension/options/options.html' })).ok, false);
+  assert.equal((await invoke({ type: 'REPORT_READ' }, { id: 'test-extension', url: 'chrome-extension://test-extension/popup/popup.html' })).ok, true);
+  assert.equal((await invoke({ type: 'REPORT_RESULT', reportId: {}, taskId: '/arbitrary' }, { id: 'test-extension', url: 'chrome-extension://test-extension/popup/popup.html' })).ok, false);
+  assert.equal(calls.length, 1);
 });
 
 const cardSender = { id: "test-extension", frameId: 0, tab: { id: 7 }, url: "https://example.com" };

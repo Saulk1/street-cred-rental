@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { MapPinIcon, MousePointer2Icon, NotebookPenIcon, LockKeyholeIcon, ArrowUpRightIcon } from 'lucide-react';
 import { Popup } from '@/popup';
+import { PropertyChat } from '@/chat';
 import { Brand } from '@/components/brand';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -16,4 +17,4 @@ function Guide({ page }: { page: string }) {
   </div><Alert role="note"><MapPinIcon aria-hidden="true" /><AlertTitle>Useful context for your next question</AlertTitle><AlertDescription>Valuations are model estimates. Overlays and nearby features provide context and do not replace a formal appraisal or planning certificate.</AlertDescription></Alert>{!panel && <Button asChild variant="outline"><a href="https://www.microburbs.com.au" target="_blank" rel="noreferrer">Explore Microburbs<ArrowUpRightIcon data-icon="inline-end" aria-hidden="true" /></a></Button>}<footer className="guide-footer">Microburbs Facts · Built by Street Cred <span>Hackathon 2026 · Beta</span></footer></main>;
 }
 const page = document.body.dataset.page ?? 'popup';
-createRoot(document.getElementById('root')!).render(page === 'popup' ? <Popup /> : <Guide page={page} />);
+createRoot(document.getElementById('root')!).render(page === 'popup' ? <Popup /> : page === 'options' ? <PropertyChat /> : <Guide page={page} />);

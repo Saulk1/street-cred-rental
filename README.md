@@ -3,8 +3,8 @@
 **Beta extension for the Microburbs Hackathon 2026, built by team Street Cred.**
 
 A Manifest V3 Chrome extension with a React, TypeScript and shadcn/ui interface.
-Version 0.1.0 opens a toolbar popup with a local notepad and buttons for the options
-page, side panel and page widget. It includes matching options and side panel pages,
+Version 0.1.0 opens a toolbar popup with property reports, a local notepad and buttons for the options
+page, side panel and page widget. The options page is a property chatbot; the side panel provides a usage guide,
 and requests the `sidePanel`, `storage` and `contextMenus` API permissions.
 A content script waits for **Show page widget** before
 adding a dismissible widget to an ordinary HTTP or HTTPS page; its manifest match
@@ -59,14 +59,18 @@ independently.
 4. Click **Load unpacked** and choose **`dist/unpacked/`**, which contains the generated manifest.
 5. Pin **Microburbs Facts** from Chrome's Extensions menu and click its icon.
 
-The committed `dist/unpacked/` folder and extension ZIP contain no private API
-key and can be loaded without building; property lookup shows setup guidance
-until rebuilt locally with a key. `.env.local` stays out of Git. Local packaging
-embeds an inspectable copy of its configured key in the generated extension.
-Do not commit or publicly distribute a locally rebuilt package containing a
-private team key.
+Previously committed distributions contain no private API key and show setup
+guidance until rebuilt locally. Local packaging writes the configured extension
+to `dist/unpacked/` and embeds an inspectable copy of its key. Public packaging
+writes a separate key-free distribution to `dist/public/`. Share that public
+folder; keep `.env.local` and authenticated local output uncommitted.
 The root `runtime-config.js` is an empty source placeholder, never a place for keys.
 The Python builder reads dotenv assignments without running shell code or expanding variables.
+
+Every property lookup (address search, core details and additional sections) uses
+the worker's shared API client and these generated settings. The optional backend
+loads the same root `.env.local` before database access; deployed server variables
+take precedence. Browser code never reads the dotenv file directly.
 
 Chrome treats loading from a new folder as a separate unpacked installation.
 If you previously loaded the repository root, its saved notes remain with that
@@ -93,6 +97,19 @@ be loaded directly as an extension.
 Disable the root installation before loading the generated folder to avoid
 duplicate controls. Its saved notes remain in the disabled installation.
 
+If lookup reports a configuration error, check the packager's **Property lookup**
+status. Edit the root `.env.local`, then run `python3 scripts/package.py`, reload
+the existing extension and refresh the webpage. Chrome reads generated
+`runtime-config.js`, not dotenv files. The runtime settings, manifest host
+permissions and `connect-src` must use the same API origins. Editing the generated
+runtime file alone can leave requests blocked by the installed manifest.
+
+Run `npm run test:package -- --check-only` to inspect the existing local output
+without rebuilding it. This catches origin/policy mismatches and differences
+between the unpacked files and ZIP. Lookup also reports configuration loading,
+invalid settings and manifest mismatches before sending requests, without logging
+keys. A public build deliberately omits the key and shows setup guidance.
+
 ### Selection card recovery
 
 After a rebuild, reload the extension **and refresh any already-open webpages**.
@@ -111,8 +128,22 @@ available with an explanation. If native popover opening fails, the card switche
 to its fixed-position fallback while keeping keyboard and dismissal behavior.
 
 Use **Open options** in the popup to open or focus the options tab. You can also
-right-click the extension's toolbar icon and choose **Options**. The page provides a branded usage guide and local-note/privacy information. Use **Open side panel** to open the matching panel in
+right-click the extension's toolbar icon and choose **Options**. The page opens the property assistant, with streaming answers, Microburbs lookups and one locally saved conversation. See [Chat setup](docs/property-chat.md) to configure the private team build. Use **Open side panel** to open the guide in
 the current browser window (Chrome 116 or newer).
+
+### Full property report
+
+After confirming an address in the selection card, open the toolbar popup's
+**Property** tab for the Rental and Buy views. Rental shows the latest advertised
+rent and nearby everyday amenities; Buy shows the valuation, comparable sales,
+zoning and environmental overlays. **Sources & full property report** opens the
+complete Microburbs report. All applicable property,
+suburb and regional datasets load progressively, including histories, geographic
+layers and area statistics. Reopening the popup restores progress and saved
+results. Individual failures can be retried without losing successful results.
+**Refresh report** requests fresh data; **Notes** keeps the existing notepad.
+See [Toolbar property reports](docs/property-report.md) for coverage, API limits,
+local caching and background recovery.
 
 ### Notepad
 
@@ -248,6 +279,30 @@ Run with Python 3 (standard library only):
 python3 scripts/package.py
 ```
 
+This default creates a private local build using the repository root `.env.local`.
+It prints the absolute **Load unpacked** folder and whether both required
+Microburbs settings are present. It never prints credentials. Missing settings
+remain supported: notes work and lookup shows setup guidance.
+
+To create and verify a public distribution:
+
+```sh
+python3 scripts/package.py --public
+npm run test:package -- --public
+```
+
+The public mode clears only the generated Microburbs API key. It preserves the
+API origins and `.env.local` itself, and leaves property lookup unconfigured in
+the shared build. Its files are `dist/public/unpacked/` and
+`dist/public/microburbs-facts-0.1.0.zip`. It never replaces `dist/unpacked/` or the
+local ZIP. Share only `dist/public/`; the local runtime configuration and ZIP
+contain credentials and must remain uncommitted.
+
+Both verifiers check the runtime origins against exact manifest host permissions
+and CSP connection sources, and compare every unpacked file with its ZIP entry.
+To verify existing output without rebuilding, append `--check-only`, with
+`--public` as well for the public folder.
+
 The archive is `dist/microburbs-facts-0.1.0.zip`. Its manifest is at the ZIP root;
 only runtime files and the MIT license are included. Documentation, skills,
 source artwork, screenshots, the API YAML, tests, `.env.local` and packaging scripts
@@ -255,6 +310,18 @@ stay out of the upload. `runtime-config.js` and the API origin permissions/CSP a
 generated in `dist/unpacked/`; the ZIP contains the same runtime bytes. Source
 files are not rewritten by the build. The generated key is worker-only and is
 not included in content scripts or web-accessible resources.
+
+On 2026-11-07, both public and local builds passed package verification. After
+reloading the existing `dist/unpacked/` installation in Chrome, selecting
+**26 Tudor Street, Surry Hills** on the test fixture returned live address matches,
+property facts and a valuation. No notes were added or deleted. The authenticated
+local build was left in place.
+
+The configuration repair was also checked in the existing Chrome installation:
+the rebuilt origin matched its manifest policy and live lookup loaded the same
+test property's facts and valuation. All 11 package tests and 72 worker/API/selection
+tests passed. A separate public build left every local runtime file and ZIP byte
+unchanged; both outputs passed `--check-only`. The root `.env.local` was unchanged.
 
 ## Modern Web Guidance tooling
 

@@ -18,14 +18,37 @@ const PROPERTY_API = (() => {
   }
   const invalid = () => new ApiError("response", "Microburbs returned an unexpected response. Please retry.");
   function configuration() {
+    const rebuild = "Rebuild from the repository root .env.local, reload the extension, and refresh this webpage.";
+    if (globalThis.MICROBURBS_CONFIG_LOAD_FAILED) {
+      throw new ApiError("configuration", "Could not load runtime-config.js. " + rebuild);
+    }
     const config = globalThis.MICROBURBS_CONFIG;
     if (!config?.apiKey || !config?.baseUrl) {
       throw new ApiError("configuration", "Set MICROBURBS_API_KEY and MICROBURBS_API_BASE_URL in .env.local, rebuild, and reload the extension.");
     }
+    let origin;
+    try {
+      const url = new URL(config.baseUrl);
+      if (url.protocol !== "https:" || url.origin !== config.baseUrl || url.username || url.password
+        || typeof config.apiKey !== "string" || config.apiKey !== config.apiKey.trim()
+        || /[\x00-\x1f\x7f]/.test(config.apiKey)) throw new Error();
+      origin = url.origin;
+    } catch {
+      throw new ApiError("configuration", "Invalid property API settings in runtime-config.js. " + rebuild);
+    }
+    const manifest = chrome.runtime.getManifest();
+    if (!manifest.host_permissions?.includes(origin + "/*")) {
+      throw new ApiError("configuration", "Property API origin does not match the installed manifest host permissions. " + rebuild);
+    }
+    const connections = (manifest.content_security_policy?.extension_pages ?? "").split(";")
+      .map(part => part.trim().split(/\s+/)).filter(parts => parts[0] === "connect-src");
+    if (connections.length !== 1 || !connections[0].slice(1).includes(origin)) {
+      throw new ApiError("configuration", "Property API origin does not match the installed manifest connect-src policy. " + rebuild);
+    }
     return config;
   }
 
-  async function request(path) {
+  async function requestEnvelope(path) {
     const config = configuration();
     if (inFlight.has(path)) return inFlight.get(path);
     const promise = (async () => {
@@ -63,7 +86,7 @@ const PROPERTY_API = (() => {
         }
         const envelope = await response.json();
         if (!object(envelope) || !Object.hasOwn(envelope, "data")) throw invalid();
-        return envelope.data;
+        return envelope;
       } catch (error) {
         if (error instanceof ApiError) throw error;
         if (controller.signal.aborted) throw new ApiError("timeout", "The Microburbs request timed out. Please retry.");
@@ -74,6 +97,8 @@ const PROPERTY_API = (() => {
     inFlight.set(path, promise);
     try { return await promise; } finally { inFlight.delete(path); }
   }
+
+  async function request(path) { return (await requestEnvelope(path)).data; }
 
   function basics(data) {
     if (!object(data)) throw invalid();
@@ -173,5 +198,7 @@ const PROPERTY_API = (() => {
       section(prefix + "/valuation/avm", valuation), section(prefix + "/risks/all", risks)]);
     return { ok: true, sections: { basics: values[0], valuation: values[1], risks: values[2] } };
   }
-  return Object.freeze({ search, details, extra });
+  // raw is worker-internal: report tasks resolve exclusively from the endpoint
+  // registry. No message handler accepts a URL or API path from a webpage.
+  return Object.freeze({ search, details, extra, raw: requestEnvelope, origin: () => configuration().baseUrl });
 })();

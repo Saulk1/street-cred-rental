@@ -4,6 +4,10 @@ The extension will query a public, read-only HTTPS API hosted on Vercel. That AP
 uses Drizzle ORM and the Neon HTTP driver to query PostgreSQL. Database connection
 strings stay on the server. The existing Microburbs API remains independent.
 
+The same backend also provides `POST /api/chat` for the options-page property
+assistant. Its OpenAI/team-token setup and streaming contract are documented in
+[Property assistant](property-chat.md); it does not query the Neon datasets.
+
 The 9,143 energy and emissions records in `assets/example.csv` have been imported
 into `energy_reports`. The Drizzle schema and generated migration are included.
 Dataset query routes and extension UI are deferred. The import uses native
@@ -14,8 +18,11 @@ PostgreSQL tools; there is no custom import or migration runner or upload endpoi
 Use Node.js 22.12+ and `npm ci`. Add `DATABASE_URL` to the existing `.env.local`,
 preserving its other settings. Add `DATABASE_MIGRATION_URL` separately when
 migrations are needed. This file is ignored by Git and excluded from deployment.
-The CLI commands below load it with Node's
-native env-file support; already-exported environment variables take precedence.
+The server database module, Drizzle configuration and server test configuration
+load the repository's `.env.local` with Node's native env-file support, including
+when imported directly or launched from another working directory. Already-exported
+environment variables take precedence. A missing local file is supported in
+deployments, which use Vercel's configured environment variables.
 
 | Variable | Purpose | Where to set it |
 | --- | --- | --- |
@@ -148,11 +155,11 @@ npm run test:package
 ```
 
 The live integration test is skipped unless `TEST_DATABASE_URL` is set. To run
-it against a development branch, put that variable in `.env.local` and
-run:
+it against a development branch, put that variable in `.env.local` and run the
+same server test command (it loads `.env.local` automatically):
 
 ```sh
-node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.server.config.mts
+npm run test:server
 ```
 
 Set `TEST_ENERGY_REPORTS=1` as well to check the 9,143-row dataset, including exact

@@ -13,7 +13,7 @@ type LookupState = { phase: 'idle' | 'loading' | 'choices' | 'empty' | 'details'
 import { absent, displayValue as value, money, Rows, Retry } from '@/components/property-feedback';
 import { PropertyExtras } from '@/components/property-extras';
 
-function RiskSection({ data }: { data: Risks }) {
+export function RiskSection({ data }: { data: Risks }) {
   const labels: Record<string, string> = { bushfire: 'Bushfire', flood: 'Flood', historical_flood: 'Historical flood', heritage: 'Heritage', landslide: 'Landslide', erosion: 'Erosion', environment: 'Environment', hv_power_line: 'High-voltage power lines', mobile_black_spot: 'Mobile black spots' };
   return <div className="risk-list">{Object.entries(labels).map(([key, label]) => <section key={key}><h4>{label}</h4>{!data[key] ? <p>{absent}</p> : !data[key]!.length ? <p>No matching records returned within the search radius (1 km).</p> : data[key]!.map((record, index) => {
     const nearby = key === 'hv_power_line' || key === 'mobile_black_spot';
@@ -21,8 +21,8 @@ function RiskSection({ data }: { data: Risks }) {
     return <div key={index} className="overlay-record"><Badge variant="outline">{relation}</Badge>{record.nearest_distance_m != null && <p>Nearest {record.nearest_distance_m} m away</p>}</div>;
   })}</section>)}<section><h4>Neighbourhood context: public housing</h4>{!data.public_housing ? <p>{absent}</p> : !data.public_housing.length ? <p>No matching records returned within 1 km.</p> : data.public_housing.map((r, i) => <p key={i}>{r.on_property === true ? 'Containing Census area' : r.on_property === false ? 'Nearby Census area' : 'Census area (location relation unknown)'}: {value(r.value)}{r.value_unit ? ` (${r.value_unit})` : ''}{r.nearest_distance_m == null ? '' : `; ${r.nearest_distance_m} m away`}</p>)}</section><p className="fine-print">Overlays are tested at the address point, not the surveyed parcel boundary. They do not replace a planning certificate.</p></div>;
 }
-function PropertySections({ sections, retry }: { sections: Sections; retry: () => void }) {
-  return <>{(['basics', 'valuation'] as const).map(key => {
+export function PropertySections({ sections, retry, keys = ['basics', 'valuation'] }: { sections: Sections; retry: () => void; keys?: ('basics' | 'valuation')[] }) {
+  return <>{keys.map(key => {
     const section = sections[key];
     let content;
     if (section?.status === 'error') content = <Retry error={section.error} retry={retry} />;
@@ -55,10 +55,10 @@ export function attachPropertyLookup({ host, shadow, selection, isCurrent, repos
         {state.phase === 'loading' && <div className="loading-results"><Spinner aria-label="Loading property information" /><Skeleton className="h-16 w-full" /><Skeleton className="h-24 w-full" /></div>}
         {state.phase === 'choices' && <><h2>Choose the matching address</h2><p className="fine-print">Check the unit number and suburb before continuing.</p><ul className="address-choices">{state.candidates.map(c => <li key={c.id}><Button variant="outline" onClick={() => void details(c)}><MapPinIcon data-icon="inline-start" aria-hidden="true" />{c.label}</Button></li>)}</ul></>}
         {state.phase === 'empty' && <Empty><EmptyHeader><EmptyTitle>No matching addresses</EmptyTitle><EmptyDescription>Select a fuller address, including the suburb. Coverage is limited to the City of Sydney LGA.</EmptyDescription></EmptyHeader></Empty>}
-        {state.phase === 'error' && <Retry error={state.error} retry={() => void (state.candidate ? details(state.candidate) : search())} />}
-        {state.phase === 'details' && state.sections && <><PropertySections sections={state.sections} retry={() => void details(state.candidate!)} />
+        {state.phase === 'error' && <Retry error={state.error} retry={() => void (state.candidate ? details(state.candidate, false) : search())} />}
+        {state.phase === 'details' && state.sections && <><PropertySections sections={state.sections} retry={() => void details(state.candidate!, false)} />
           <PropertyExtras key={`${revision}:${state.candidate!.id}`} id={state.candidate!.id} reposition={reposition}
-            risks={state.sections.risks?.status === 'error' ? <Retry error={state.sections.risks.error} retry={() => void details(state.candidate!)} />
+            risks={state.sections.risks?.status === 'error' ? <Retry error={state.sections.risks.error} retry={() => void details(state.candidate!, false)} />
               : state.sections.risks?.status === 'ok' ? <RiskSection data={state.sections.risks.data} /> : <p>{absent}</p>} /><p className="fine-print">Source: Microburbs Hackathon API. Coverage: City of Sydney LGA.</p></>}
         {state.candidate && state.candidates.length > 1 && state.phase !== 'loading' && <Button variant="outline" onClick={choices}><ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />Choose another match</Button>}
       </section>}
@@ -84,9 +84,13 @@ export function attachPropertyLookup({ host, shadow, selection, isCurrent, repos
     else if (response.candidates.length === 1) await details(response.candidates[0]);
     else choices();
   }
-  async function details(candidate: Candidate) {
+  async function details(candidate: Candidate, confirm = true) {
     const token = ++revision;
     expand(); state = { phase: 'loading', candidate, candidates: state.candidates, announcement: 'Loading property information…' }; render();
+    // Persist the confirmed match before fetching. Report failures must not stop
+    // the existing card or let a later network response choose the active address.
+    if (confirm) await send({ type: 'CONFIRM_PROPERTY', candidate: { id: candidate.id, label: candidate.label } });
+    if (disposed || !isCurrent() || token !== revision) return;
     const response = await send({ type: 'PROPERTY_DETAILS', id: candidate.id });
     if (disposed || !isCurrent() || token !== revision) return;
     state = response.ok && response.sections ? { ...state, phase: 'details', sections: response.sections, announcement: 'Property information loaded. Unavailable sections are marked below.' } : { ...state, phase: 'error', error: response.error, announcement: 'Property lookup failed.' };

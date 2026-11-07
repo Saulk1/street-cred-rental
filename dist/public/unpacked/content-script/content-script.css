@@ -1,0 +1,17 @@
+#microburbs-facts-widget, :host {
+  all: initial;
+  box-sizing: border-box;
+  position: fixed;
+  inset: auto 16px 16px auto;
+  z-index: 2147483646;
+  inline-size: 320px;
+  max-inline-size: calc(100vw - 32px);
+  max-block-size: calc(100dvh - 32px);
+  overflow: auto;
+  border-radius: 12px;
+  background: #fff;
+  color: #183d32;
+  font: 14px/1.5 system-ui, sans-serif;
+  box-shadow: 0 8px 32px #183d3224;
+}
+#microburbs-facts-widget[hidden] { display: none; }

@@ -5,6 +5,9 @@
   "buildCommand": "npm run typecheck:server",
   "outputDirectory": "server/public",
   "functions": {
+    "api/chat.ts": {
+      "maxDuration": 60
+    },
     "api/health.ts": {
       "maxDuration": 10
     }

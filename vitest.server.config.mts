@@ -1,3 +1,4 @@
+import './server/env.mjs';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({

@@ -4,15 +4,18 @@ import vm from "node:vm";
 import test from "node:test";
 const source = await readFile(new URL("../property-api.js", import.meta.url), "utf8");
 const config = { baseUrl: "https://api.example.test", apiKey: "test-only-key" };
+const manifest = { host_permissions: [config.baseUrl + "/*"],
+  content_security_policy: { extension_pages: "default-src 'none'; connect-src " + config.baseUrl } };
 const reply = (data, status = 200, headers = {}) => ({ ok: status === 200, status,
   headers: { get: name => headers[name] ?? null }, json: async () => ({ data }) });
-function client(handler, configured = config) {
+function client(handler, configured = config, installedManifest = manifest, loadFailed = false) {
   let now = 100000;
   const calls = [];
   const timeouts = new Map();
   let timer = 0;
   class Clock extends Date { static now() { return now; } }
-  const context = vm.createContext({ MICROBURBS_CONFIG: configured, Date: Clock, URLSearchParams,
+  const context = vm.createContext({ MICROBURBS_CONFIG: configured, MICROBURBS_CONFIG_LOAD_FAILED: loadFailed,
+    chrome: { runtime: { getManifest: () => installedManifest } }, Date: Clock, URL, URLSearchParams,
     AbortController,
     setTimeout(fn, delay) {
       const id = ++timer;
@@ -33,6 +36,30 @@ test("missing key returns setup guidance without a request", async () => {
   assert.equal(result.error.code, "configuration");
   assert.match(result.error.message, /\.env.local/);
   assert.equal(app.calls.length, 0);
+});
+
+test("configuration failures identify loading, invalid values and policy mismatches before fetching", async () => {
+  const cases = [
+    [config, manifest, true, /Could not load runtime-config/],
+    [{ ...config, baseUrl: "http://api.example.test" }, manifest, false, /Invalid property API settings/],
+    [{ ...config, baseUrl: "https://api.example.test/path" }, manifest, false, /Invalid property API settings/],
+    [{ ...config, apiKey: " test-only-key" }, manifest, false, /Invalid property API settings/],
+    [{ ...config, apiKey: "test-only-key\n" }, manifest, false, /Invalid property API settings/],
+    [{ ...config, baseUrl: "https://other.example.test" }, manifest, false, /host permissions/],
+    [config, { ...manifest, host_permissions: [] }, false, /host permissions/],
+    [config, { ...manifest, content_security_policy: { extension_pages: "connect-src 'none'" } }, false, /connect-src/],
+    [config, { ...manifest, content_security_policy: {} }, false, /connect-src/],
+    [config, { ...manifest, content_security_policy: {
+      extension_pages: "connect-src https://api.example.test; connect-src 'none'" } }, false, /connect-src/],
+  ];
+  for (const [settings, policy, failed, message] of cases) {
+    const app = client(() => { throw new Error("Must not fetch"); }, settings, policy, failed);
+    const result = await app.api.search("address");
+    assert.equal(result.error.code, "configuration");
+    assert.match(result.error.message, message);
+    assert.ok(!JSON.stringify(result).includes(config.apiKey));
+    assert.equal(app.calls.length, 0);
+  }
 });
 
 test("geocoding encodes unit addresses and normalises open candidate shapes", async () => {

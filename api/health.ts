@@ -1,3 +1,3 @@
-import { health } from '../server/health';
+import { health } from '../server/health.js';
 
 export default { fetch: health };

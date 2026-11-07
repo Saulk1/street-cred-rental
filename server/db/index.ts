@@ -1,7 +1,8 @@
+import '../env.mjs';
 import { neon } from '@neondatabase/serverless';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
-import * as schema from './schema';
+import * as schema from './schema.js';
 
 // Create per request: the abort signal must never be reused by a warm function.
 // Builds and imports do not require database credentials.

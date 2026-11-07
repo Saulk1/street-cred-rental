@@ -12,7 +12,7 @@ beforeEach(() => {
   api = { runtime: { getURL: (s: string) => s, openOptionsPage: vi.fn(async () => {}) }, windows: { getCurrent: vi.fn(async () => ({ id: 7 })) }, sidePanel: { open: vi.fn(async () => {}) }, tabs: { query: vi.fn(async () => [{ id: 42 }]), sendMessage: vi.fn(async () => ({ ok: true })) }, storage: { local: { get: vi.fn(async () => structuredClone(stored)), set: vi.fn(async (items: object) => { Object.assign(stored, items); changes.forEach(c => c(items, 'local')); }), remove: vi.fn(async (key: string) => { delete stored[key]; changes.forEach(c => c({ [key]: {} }, 'local')); }) }, onChanged: { addListener: (fn: any) => changes.push(fn), removeListener: (fn: any) => { changes = changes.filter(c => c !== fn); } } } };
   vi.stubGlobal('chrome', api);
 });
-async function mount() { const user = userEvent.setup(); const view = render(<Popup />); await screen.findByText('No saved notes yet'); return { user, ...view }; }
+async function mount() { const user = userEvent.setup(); const view = render(<Popup />); await user.click(screen.getByRole('tab', { name: 'Notes' })); await screen.findByText('No saved notes yet'); return { user, ...view }; }
 const put = (id: string, text: string, createdAt = 1, type = 'manual') => stored['microburbs.note.' + id] = { id, text, createdAt, type };
 it('dispatches side panel immediately in the gesture; options/widget actions report failures and retry', async () => {
   const { user } = await mount();
@@ -38,7 +38,7 @@ it('saves literal multiline Unicode, preserves it across remount and deletes wit
   await user.click(screen.getByRole('button', { name: 'Save note' }));
   expect(Object.values(stored)[0]).toMatchObject({ text, type: 'manual' });
   expect(document.querySelector('script')).toBeNull();
-  unmount(); render(<Popup />);
+  unmount(); render(<Popup />); await user.click(screen.getByRole('tab', { name: 'Notes' }));
   const remove = await screen.findByRole('button', { name: /Delete note:/ });
   remove.focus(); await user.keyboard('{Enter}');
   await screen.findByText('No saved notes yet');
@@ -79,10 +79,11 @@ it('retains valid legacy notes, ordering and rejects malformed stored values', (
   put('a', 'A', 1, 'url'); put('b', 'B', 3); stored['microburbs.note.invalid'] = { id: 'different' }; stored.other = {};
   expect(readNotes(stored).map(n => n.text)).toEqual(['B', 'A']);
 });
-it('removes subscriptions after closing', async () => { const { unmount } = await mount(); expect(changes).toHaveLength(1); unmount(); expect(changes).toHaveLength(0); });
+it('removes subscriptions after closing', async () => { const { unmount } = await mount(); expect(changes).toHaveLength(2); unmount(); expect(changes).toHaveLength(0); });
 it('shows initial storage failure without claiming the notepad is empty', async () => {
   api.storage.local.get.mockRejectedValueOnce(new Error()); render(<Popup />);
-  await screen.findByText('Saved notes could not be loaded');
+  await userEvent.setup().click(screen.getByRole('tab', { name: 'Notes' }));
+  expect(await screen.findByText('Saved notes could not be loaded')).toBeVisible();
   expect(screen.queryByText('No saved notes yet')).toBeNull();
 });
 it('preserves another context’s save while a deletion is pending', async () => {

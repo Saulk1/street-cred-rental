@@ -1,4 +1,9 @@
 {
   "extends": "../tsconfig.server.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": []
+  },
   "include": ["./**/*.ts", "../server/**/*.ts"]
 }

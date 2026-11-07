@@ -17,7 +17,8 @@ function mount(handler: any) {
 it('auto-loads a single match, zero vs missing values and accurate overlay labels', async () => {
   const app = mount((m: any) => Promise.resolve(m.type === 'SEARCH_ADDRESS' ? { ok: true, candidates: [candidate] } : reply()));
   await act(async () => { await app.active.start(); });
-  expect(app.send.mock.calls.map(c => c[0].type)).toEqual(['SEARCH_ADDRESS', 'PROPERTY_DETAILS']);
+  expect(app.send.mock.calls.map(c => c[0].type)).toEqual(['SEARCH_ADDRESS', 'CONFIRM_PROPERTY', 'PROPERTY_DETAILS']);
+  expect(app.send).toHaveBeenCalledWith({ type: 'CONFIRM_PROPERTY', candidate });
   expect(app.ui.getByText('$1,200,000')).toBeVisible(); expect(app.ui.getByText('0')).toBeVisible();
   expect(app.ui.getAllByText('Not available').length).toBeGreaterThan(0);
   expect(app.shadow.activeElement).toHaveClass('property-results');
@@ -39,7 +40,7 @@ it('retains facts during partial failure and retries property details', async ()
   await act(async () => { await app.active.start(); });
   expect(app.ui.getByText('house')).toBeVisible(); expect(app.ui.getByText('Request ID: support-id')).toBeVisible();
   await act(async () => fireEvent.click(app.ui.getByRole('button', { name: 'Retry' })));
-  expect(app.send).toHaveBeenCalledTimes(3);
+  expect(app.send).toHaveBeenCalledTimes(4);
 });
 it('shows empty results and configuration errors, without disabling independent save', async () => {
   const app = mount(() => Promise.resolve({ ok: true, candidates: [] }));
@@ -82,7 +83,7 @@ async function openSection(app: ReturnType<typeof mount>, name: string) {
 it('loads each section on first expansion and caches collapse/reopen without hiding the overview', async () => {
   const app = mount(expandedHandler);
   await act(async () => { await app.active.start(); });
-  expect(app.send).toHaveBeenCalledTimes(2);
+  expect(app.send).toHaveBeenCalledTimes(3);
   await openSection(app, 'Zoning and planning');
   expect(app.send).toHaveBeenLastCalledWith({ type: 'PROPERTY_SECTION', id: candidate.id, section: 'planning' });
   expect(app.ui.getByText('R2')).toBeVisible();
@@ -91,7 +92,7 @@ it('loads each section on first expansion and caches collapse/reopen without hid
   expect(app.ui.getByText('$1,200,000')).toBeVisible();
   await openSection(app, 'Zoning and planning');
   await openSection(app, 'Zoning and planning');
-  expect(app.send).toHaveBeenCalledTimes(3);
+  expect(app.send).toHaveBeenCalledTimes(4);
   await openSection(app, 'Nearby transport');
   expect(app.ui.getByRole('button', { name: 'Zoning and planning' })).toHaveAttribute('aria-expanded', 'true');
   expect(app.ui.getByText('Bus stop · 130 m')).toBeVisible();
@@ -113,12 +114,12 @@ it('shows five list results initially and expands fetched data without new API c
   expect(app.ui.queryByText('Example School Six')).toBeNull();
   expect(app.ui.getByText(/Showing 5 of 6 returned schools/)).toBeVisible();
   await openSection(app, 'Show more schools');
-  expect(app.ui.getByText('Example School Six')).toBeVisible(); expect(app.send).toHaveBeenCalledTimes(3);
+  expect(app.ui.getByText('Example School Six')).toBeVisible(); expect(app.send).toHaveBeenCalledTimes(4);
   await openSection(app, 'Nearby amenities');
   expect(app.ui.getByText('Total: 8')).toBeVisible(); expect(app.ui.getByText('Showing 5 of 6 returned results.')).toBeVisible();
   expect(app.ui.queryByText('Example Market Six')).toBeNull();
   await openSection(app, 'Show more supermarkets');
-  expect(app.ui.getByText('Example Market Six')).toBeVisible(); expect(app.send).toHaveBeenCalledTimes(4);
+  expect(app.ui.getByText('Example Market Six')).toBeVisible(); expect(app.send).toHaveBeenCalledTimes(5);
   expect(app.ui.getByText('Total: 0')).toBeVisible(); expect(app.ui.getByText('Unnamed amenity')).toBeVisible();
 });
 it('market retry fetches only the failed resource and keeps the successful observation', async () => {
@@ -164,7 +165,7 @@ it('keeps loaded collapsed content searchable and synchronizes expansion on befo
     expect(hidden).toHaveAttribute('hidden', 'until-found');
     act(() => hidden.dispatchEvent(new Event('beforematch', { bubbles: true })));
     expect(app.ui.getByRole('button', { name: 'Zoning and planning' })).toHaveAttribute('aria-expanded', 'true');
-    expect(hidden).not.toHaveAttribute('hidden'); expect(app.send).toHaveBeenCalledTimes(3);
+    expect(hidden).not.toHaveAttribute('hidden'); expect(app.send).toHaveBeenCalledTimes(4);
   } finally {
     if (prior) Object.defineProperty(HTMLElement.prototype, 'onbeforematch', prior);
     else delete (HTMLElement.prototype as any).onbeforematch;

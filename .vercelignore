@@ -1,9 +1,11 @@
 # Upload only the API, its dependencies and build configuration.
 *
-!api/
+!api
 !api/**
-!server/
+!server
 !server/**
+!shared
+!shared/**
 !package.json
 !package-lock.json
 !tsconfig.json

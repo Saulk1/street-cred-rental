@@ -1,4 +1,4 @@
-import { checkDatabase } from './db';
+import { checkDatabase } from './db/index.js';
 
 export async function health(request: Request): Promise<Response> {
   const headers = { 'Cache-Control': 'no-store' };

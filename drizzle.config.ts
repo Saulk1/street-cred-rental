@@ -1,3 +1,4 @@
+import './server/env.mjs';
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({

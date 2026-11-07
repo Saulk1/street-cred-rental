@@ -10,7 +10,7 @@
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },
-  "permissions": ["sidePanel", "storage", "contextMenus"],
+  "permissions": ["sidePanel", "storage", "contextMenus", "alarms"],
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],

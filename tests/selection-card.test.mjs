@@ -9,6 +9,7 @@ const source = await readFile(new URL("../content-script/selection-card.js", imp
 const consts = await readFile(new URL("../consts.js", import.meta.url), "utf8");
 const apiSource = await readFile(new URL("../property-api.js", import.meta.url), "utf8");
 const background = await readFile(new URL("../background.js", import.meta.url), "utf8");
+const reportSources = Object.fromEntries(await Promise.all(['report-endpoints.js', 'report-plan.js', 'report-store.js', 'report-worker.js'].map(async name => [name, await readFile(new URL('../' + name, import.meta.url), 'utf8')])));
 
 const cardId = "microburbs-facts-selection-card";
 
@@ -463,6 +464,7 @@ test("a card click reaches the real background handler and publishes a local sto
   context.importScripts = path => {
     if (path === "consts.js") vm.runInContext(consts, context);
     else if (path === "property-api.js") vm.runInContext(apiSource, context);
+    else if (path.startsWith('report-')) vm.runInContext(reportSources[path], context);
     else throw new Error("Missing generated configuration");
   };
   vm.runInContext(background, context);

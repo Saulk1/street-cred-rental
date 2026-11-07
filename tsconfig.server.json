@@ -6,5 +6,5 @@
     "types": ["node"],
     "paths": {}
   },
-  "include": ["api", "server", "drizzle.config.ts", "vitest.server.config.mts", "tests/server"]
+  "include": ["api", "server", "drizzle.config.ts", "drizzle.compute.config.ts", "vitest.server.config.mts", "tests/server"]
 }

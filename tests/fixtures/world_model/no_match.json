@@ -1,0 +1,71 @@
+{
+  "fixture_id": "no_match",
+  "data_mode": "demo",
+  "notice": "演示数据，不是真实在租房源；仅用于复现某分支零候选。",
+  "description": "A 距站 900 米、B 距站 600 米：400 米分支为零候选，必须保留 NO_MATCH 并且仍然先问。",
+  "request": {
+    "session_id": "demo-session-001",
+    "search_id": "search-001",
+    "state_version": 3,
+    "candidate_snapshot_id": "candidates-003",
+    "ranker_snapshot_id": "ranker-007",
+    "station_walk": {
+      "status": "unknown",
+      "max_m": null
+    },
+    "asked_question_keys": [],
+    "user_state": {
+      "budget_weekly_max": 750,
+      "bedrooms": null,
+      "districts": [],
+      "soft_preferences": {
+        "emphasis": "groceries"
+      },
+      "other_confirmed": {
+        "pets_allowed": false
+      }
+    },
+    "candidates": [
+      {
+        "listing_id": "A",
+        "weekly_rent": 720,
+        "supermarket_walk_min": 2,
+        "station_walk_m": 900,
+        "distance_kind": "walking",
+        "source": "demo",
+        "collected_at": "2026-11-06T00:00:00Z"
+      },
+      {
+        "listing_id": "B",
+        "weekly_rent": 740,
+        "supermarket_walk_min": 6,
+        "station_walk_m": 600,
+        "distance_kind": "walking",
+        "source": "demo",
+        "collected_at": "2026-11-06T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "action": "ask",
+    "reason_code": "different_top_choice",
+    "question_key": "station_walk_max_m",
+    "option_ids": [
+      "le_400",
+      "le_1000",
+      "no_limit",
+      "skip"
+    ],
+    "branch_tops": {
+      "station-le-400": null,
+      "station-le-1000": "A",
+      "station-no-limit": "A"
+    },
+    "feasible_counts": {
+      "station-le-400": 0,
+      "station-le-1000": 2,
+      "station-no-limit": 2
+    },
+    "divergence": 0.3333
+  }
+}

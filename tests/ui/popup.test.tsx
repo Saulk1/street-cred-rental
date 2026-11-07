@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Popup } from '../../src/popup';
-import { readNotes } from '../../src/types';
+import { Popup } from '../../extension/src/popup';
+import { readNotes } from '../../extension/src/types';
 
 let stored: Record<string, unknown>;
 let changes: ((values: Record<string, unknown>, area: string) => void)[];

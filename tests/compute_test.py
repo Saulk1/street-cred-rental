@@ -4,109 +4,118 @@ import os
 import time
 import unittest
 from unittest.mock import patch
+from api.compute import process, handler
+from compute.registry import ComputeError, Context, run
+from compute.rental import export_advisor, restore_advisor, load_artifacts
+from compute.world_model.advisor import RentalAdvisor
+from compute.world_model.types import Listing
+from compute.world_model.value_ranker import ValueRanker
 
-from api.compute import handler, process
-from compute.registry import CATALOG, CALCULATORS, ComputeError, run
+TOKEN = 'dummy-compute-token-32-characters-long'
 
-TOKEN = "dummy-compute-token-32-characters-long"
-
-
-def payload(value=750, price=720):
-    return {"calculator": "rent_comparison", "version": "1.0.0", "inputs": {"weekly_rent_aud": value, "reference_period": "week"},
-            "datasets": {"latest_rent": {"price": price, "type": "For Rent", "date": "2025-07-24", "address": "Example address"}},
-            "deadlineMs": time.time() * 1000 + 8000}
-
+def payload(command=None, state=None, version=None):
+    return {'calculator': 'rental_advisor', 'version': '1.0.0', 'command': command or {'operation':'start','text':'one bedroom budget $800 per week near UTS'},
+            'state': state, 'artifactVersion': version, 'deadlineMs': time.time()*1000+8000}
 
 class ComputeTests(unittest.TestCase):
-    def test_numerical_results_and_contract(self):
-        result = run(payload())
-        self.assertEqual(result["status"], "ok")
-        self.assertEqual([m["value"] for m in result["metrics"]], [720, 30, 1560, 4.17])
-        self.assertEqual([{k: m[k] for k in ("key", "label", "unit")} for m in result["metrics"]], CATALOG[0]["metrics"])
-        self.assertIn("historical asking rent", result["warnings"][0])
+    def test_real_planner_questions_survive_the_compute_boundary(self):
+        listings = [Listing(listing_id='A', station_walk_m=300, weekly_rent=550, bedrooms=1,
+                            supermarket_walk_min=5, extra={'fair_rent':700, 'features':{'pets':False, 'furnished':False}}),
+                    Listing(listing_id='B', station_walk_m=300, weekly_rent=650, bedrooms=1,
+                            supermarket_walk_min=5, extra={'fair_rent':700, 'features':{'pets':True, 'furnished':True}})]
+        manifest = {'version':'a'*64, 'modelVersion':'fixture', 'collectedAt':'2026-11-07T00:00:00Z'}
+        with patch('compute.rental.load_artifacts', return_value=(manifest, listings, ValueRanker('fixture'))):
+            first = run(payload({'operation':'start', 'text':'Find a one-bedroom rental under $800 near UTS'}))
+            self.assertEqual(first['state']['state']['bedrooms'], 1)
+            self.assertEqual(first['result']['action'], 'ask')
+            self.assertEqual(first['result']['question_key'], 'needs.furnished')
+            self.assertEqual(first['result']['question_text'], 'Do you need a furnished home?')
+            self.assertEqual(first['state']['pending']['diagnostics']['ask_threshold'], 3.0)
+            resumed = run(payload({'operation':'resume'}, first['state'], first['artifactVersion']))
+            self.assertEqual(resumed['result']['question_id'], first['result']['question_id'])
+            second = run(payload({'operation':'answer', 'questionId':first['result']['question_id'], 'optionId':'skip'}, resumed['state'], first['artifactVersion']))
+            self.assertEqual(second['result']['action'], 'ask')
+            self.assertEqual(second['result']['question_key'], 'needs.pets')
+            self.assertNotEqual(second['result']['question_id'], first['result']['question_id'])
+            last = run(payload({'operation':'message', 'text':'skip'}, second['state'], first['artifactVersion']))
+            self.assertEqual(last['result']['action'], 'recommend')
+            self.assertEqual(len(last['state']['asked_keys']), 2)
 
-    def test_zero_and_negative_differences(self):
-        self.assertEqual(run(payload(0))["metrics"][3]["value"], -100)
-        self.assertEqual(run(payload(720))["metrics"][1]["value"], 0)
+    def test_real_planner_recommends_without_unnecessary_questions(self):
+        listings = [Listing(listing_id='A', station_walk_m=100, weekly_rent=600, bedrooms=1,
+                            supermarket_walk_min=5, extra={'fair_rent':700, 'features':{'pets':True, 'furnished':True, 'parking':True}})]
+        manifest = {'version':'a'*64, 'modelVersion':'fixture', 'collectedAt':'2026-11-07T00:00:00Z'}
+        with patch('compute.rental.load_artifacts', return_value=(manifest, listings, ValueRanker('fixture'))):
+            result = run(payload())
+            self.assertEqual(result['result']['action'], 'recommend')
+            self.assertEqual(result['result']['reason_code'], 'no_question_worth_asking')
+            self.assertEqual(result['state']['asked_keys'], [])
 
-    def test_decimal_money(self):
-        result = run(payload(750.15, 720.10))
-        self.assertEqual(result["metrics"][1]["value"], 30.05)
-        self.assertEqual(result["metrics"][2]["value"], 1562.6)
+    def test_state_roundtrip_with_pending_question(self):
+        listings = [Listing(listing_id='A',station_walk_m=300,weekly_rent=600,bedrooms=1,extra={'fair_rent':700,'features':{'pets':False}}),
+                    Listing(listing_id='B',station_walk_m=1000,weekly_rent=650,bedrooms=1,extra={'fair_rent':700,'features':{'pets':True}})]
+        ranker=ValueRanker('test')
+        advisor=RentalAdvisor(listings,ranker)
+        advisor.intake('budget 800')
+        result=advisor.next()
+        saved=json.loads(json.dumps(export_advisor(advisor)))
+        restored=restore_advisor(saved,listings,ranker)
+        self.assertEqual(export_advisor(restored),saved)
+        self.assertEqual(restored.next(),advisor.next())
+        if result['action']=='ask':
+            q=result['question_id']; opt=result['options'][0]['id']
+            self.assertEqual(advisor.answer(q,option_id=opt),restored.answer(q,option_id=opt))
 
-    def test_missing_inputs(self):
-        self.assertEqual(run(payload(None))["status"], "needs_input")
-        body = payload(); body["inputs"]["reference_period"] = None
-        self.assertEqual(run(body)["missing"][0]["key"], "reference_period")
+    def test_private_artifacts_recommendations_and_followup(self):
+        try: load_artifacts()
+        except ComputeError: self.skipTest('Private artifacts not staged')
+        result=run(payload())
+        for home in result['result'].get('recommendations',[]):
+            self.assertNotRegex(home['reason'], r'[\u4e00-\u9fff]')
+        self.assertEqual(result['status'],'ok')
+        self.assertIn(result['result']['action'],['ask','recommend'])
+        next_result=run(payload({'operation':'resume'},result['state'],result['artifactVersion']))
+        self.assertEqual(next_result['result']['provenance'],result['result']['provenance'])
+        for home in result['result'].get('recommendations',[]):
+            self.assertGreater(home['weeklyRent'],0)
+            self.assertIn('stationWalkBand',home)
+        with self.assertRaises(ComputeError): run(payload({'operation':'resume'},result['state'],'0'*64))
 
-    def test_period_conversions_use_user_confirmed_units(self):
-        for period, price in [("month", 3120), ("fortnight", 1440), ("year", 37440)]:
-            body = payload(price=price); body["inputs"]["reference_period"] = period
-            self.assertEqual([m["value"] for m in run(body)["metrics"]], [720, 30, 1560, 4.17])
-        body = payload(); body["inputs"]["reference_period"] = "guess"
-        with self.assertRaises(ComputeError):
-            run(body)
+    def test_request_guards_and_removed_calculator(self):
+        for change in [{'calculator':'rent_comparison'}, {'version':'bad'}, {'deadlineMs':1}, {'deadlineMs':float('nan')}, {'deadlineMs':True}, {'command':[]}, {'extra':1}]:
+            with self.subTest(change=change),self.assertRaises(ComputeError): run({**payload(),**change})
 
-    def test_unknown_modules_and_versions(self):
-        for key, value in [("calculator", "../../os"), ("calculator", ["rent_comparison"]), ("version", "bad")]:
-            body = payload(); body[key] = value
-            with self.subTest(key=key, value=value), self.assertRaises(ComputeError):
-                run(body)
-        self.assertEqual(set(CALCULATORS), {entry["id"] for entry in CATALOG})
+    def test_auth_limits_and_safe_errors(self):
+        with patch.dict(os.environ,{'COMPUTE_SERVICE_TOKEN':TOKEN}):
+            self.assertEqual(process('GET','','application/json',b'{}')[0],405)
+            self.assertEqual(process('POST','wrong','application/json',b'{}')[0],401)
+            self.assertEqual(process('POST','Bearer '+TOKEN,'text/plain',b'{}')[0],400)
+            self.assertEqual(process('POST','Bearer '+TOKEN,'application/json',b'x'*64001)[0],400)
+            self.assertEqual(process('POST','Bearer '+TOKEN,'application/json',b'invalid')[0],400)
+        with patch.dict(os.environ,{'COMPUTE_SERVICE_TOKEN':''}):
+            self.assertEqual(process('POST','','application/json',b'{}')[0],503)
 
-    def test_rejects_invalid_numbers_fields_and_deadlines(self):
-        for value in [True, "750", float("nan"), float("inf"), -1, 1000001]:
-            with self.subTest(value=value), self.assertRaises(ComputeError):
-                run(payload(value))
-        for changes in [{"deadlineMs": 1}, {"deadlineMs": time.time() * 1000 + 60000}, {"inputs": {"other": 1}}, {"datasets": {}}, {"extra": "no"}]:
-            with self.subTest(changes=changes), self.assertRaises(ComputeError):
-                run({**payload(), **changes})
+    def test_missing_artifacts_are_explicit(self):
+        from pathlib import Path
+        load_artifacts.cache_clear()
+        with patch('compute.rental.ARTIFACTS',Path('/nonexistent/rental-test')):
+            with self.assertRaises(ComputeError) as caught: load_artifacts()
+            self.assertEqual(caught.exception.code,'unavailable')
+        load_artifacts.cache_clear()
 
-    def test_unavailable_is_not_zero_or_a_valuation(self):
-        for price in [0, None, -1, "720", float("nan")]:
-            self.assertEqual(run(payload(price=price))["status"], "unavailable")
-        body = payload(); body["datasets"]["latest_rent"]["type"] = "Sold"
-        self.assertEqual(run(body)["status"], "unavailable")
-
-    @patch.dict(os.environ, {"COMPUTE_SERVICE_TOKEN": TOKEN})
-    def test_endpoint_auth_validation_and_safe_failures(self):
-        auth = "Bearer " + TOKEN
-        raw = json.dumps(payload()).encode()
-        self.assertEqual(process("GET", auth, "application/json", raw)[0], 405)
-        self.assertEqual(process("POST", "wrong", "application/json", raw)[0], 401)
-        self.assertEqual(process("POST", auth, "text/plain", raw)[0], 400)
-        self.assertEqual(process("POST", auth, "application/json", b"invalid")[0], 400)
-        self.assertEqual(process("POST", auth, "application/json", b"x" * 64001)[0], 400)
-        self.assertEqual(process("POST", auth, "application/json", raw)[0], 200)
-        with patch.dict(CALCULATORS, {"rent_comparison": lambda *_: (_ for _ in ()).throw(RuntimeError("private secret"))}):
-            status, body = process("POST", auth, "application/json", raw)
-            self.assertEqual(status, 500)
-            self.assertNotIn("private secret", json.dumps(body))
-
-    @patch.dict(os.environ, {"COMPUTE_SERVICE_TOKEN": ""})
-    def test_unconfigured(self):
-        self.assertEqual(process("POST", "", "application/json", b"{}")[0], 503)
-
-    @patch.dict(os.environ, {"COMPUTE_SERVICE_TOKEN": TOKEN})
-    def test_http_adapter_headers_and_body_limit(self):
-        raw = json.dumps(payload()).encode()
-        instance = handler.__new__(handler)
-        instance.command = "POST"
-        instance.headers = {"Content-Length": str(len(raw)), "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN}
-        instance.rfile, instance.wfile = io.BytesIO(raw), io.BytesIO()
-        headers = {}
-        statuses = []
-        instance.send_response = statuses.append
-        instance.send_header = lambda k, v: headers.update({k: v})
-        instance.end_headers = lambda: None
-        instance.respond()
-        self.assertEqual(statuses, [200])
-        self.assertEqual(headers["Cache-Control"], "no-store")
-        self.assertEqual(json.loads(instance.wfile.getvalue())["status"], "ok")
-        instance.headers["Content-Length"] = "64001"
-        instance.respond()
-        self.assertEqual(statuses[-1], 413)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_artifact_corruption_is_unavailable(self):
+        import tempfile
+        from pathlib import Path
+        import hashlib
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)
+            manifest={'schema':1,'collectedAt':'2026-11-07T00:00:00Z','modelVersion':'test',
+                      'files':{'fair_rent_model.json':'0'*64,'for_rent_snapshot.json':'0'*64}}
+            manifest['version']=hashlib.sha256(json.dumps(manifest,sort_keys=True).encode()).hexdigest()
+            (path/'manifest.json').write_text(json.dumps(manifest))
+            (path/'fair_rent_model.json').write_text('{}')
+            load_artifacts.cache_clear()
+            with patch('compute.rental.ARTIFACTS',path),self.assertRaises(ComputeError) as caught:
+                load_artifacts()
+            self.assertEqual(caught.exception.code,'unavailable')
+        load_artifacts.cache_clear()

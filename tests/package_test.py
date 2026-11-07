@@ -22,17 +22,40 @@ with mock.patch.dict(sys.modules, {'package': pack}):
 
 
 def copy_runtime_tree(root):
-    manifest = json.loads((ROOT / 'manifest.json').read_text())
+    manifest = json.loads((ROOT / 'extension/manifest.json').read_text())
     for name in pack.runtime_files(manifest):
         if name == 'runtime-config.js':
             continue
-        target = root / name
+        target = pack.runtime_source(root, name)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(pack.runtime_source(ROOT, name).read_bytes())
     return manifest
 
 
 class PackageTests(unittest.TestCase):
+    def test_relocated_sources_keep_installed_paths_and_exclude_development_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_manifest = copy_runtime_tree(root)
+            # Old root files must never shadow the new source tree.
+            (root / 'manifest.json').write_text('obsolete root manifest')
+            (root / 'background.js').write_text('obsolete root worker')
+            for name in ['extension/src/pages.tsx', 'data/reference.csv',
+                         'docs/api/spec.yaml', 'docs/media/pitch.mp4',
+                         'reports/report.html', 'tests/fixtures/scenario.json']:
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('development-only-marker')
+            manifest, contents, archive = pack.build(root)
+            self.assertEqual(manifest, source_manifest)
+            self.assertEqual(contents['background.js'], (root / 'extension/background.js').read_bytes())
+            self.assertEqual(contents['ui/pages.js'], (root / '.build/runtime/ui/pages.js').read_bytes())
+            self.assertEqual(contents['LICENSE'], (root / 'LICENSE').read_bytes())
+            self.assertFalse(any(name.startswith(('extension/', 'data/', 'docs/', 'reports/', 'tests/')) for name in contents))
+            self.assertTrue(all(b'development-only-marker' not in data for data in contents.values()))
+            with redirect_stdout(io.StringIO()):
+                verify.verify(root, manifest, contents, archive)
+
     def test_chat_settings_and_provider_secrets_are_separated_in_all_builds(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -44,6 +67,7 @@ class PackageTests(unittest.TestCase):
                 'OPENAI_MODEL=server-only-model\n'
                 'COMPUTE_API_URL=https://compute-private.example.test/api/compute\n'
                 'COMPUTE_SERVICE_TOKEN=dummy-compute-secret\n'
+                'COMPUTE_DATABASE_URL=postgresql://writer:dummy-compute-db-secret@compute-db.invalid/neondb\n'
                 'DATABASE_URL=postgresql://dummy-database-secret\n')
             for public in [False, True]:
                 manifest, contents, archive = pack.build(root, public_build=public)
@@ -51,11 +75,11 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(chat, {'baseUrl': 'https://chat.example.test', 'token': '' if public else 'dummy-chat-secret'})
                 self.assertIn(b'../runtime-config.js', contents['options/options.html'])
                 for data in contents.values():
-                    for secret in [b'dummy-openai-secret', b'server-only-model', b'dummy-database-secret', b'dummy-compute-secret', b'compute-private.example.test']:
+                    for secret in [b'dummy-openai-secret', b'server-only-model', b'dummy-database-secret', b'dummy-compute-secret', b'compute-private.example.test', b'dummy-compute-db-secret', b'compute-db.invalid']:
                         self.assertNotIn(secret, data)
                     if public:
                         self.assertNotIn(b'dummy-chat-secret', data)
-                self.assertFalse(any(name.endswith('.py') or name.startswith('compute/') for name in contents))
+                self.assertFalse(any(name.endswith('.py') or name.startswith(('compute/', '.private/', 'rental-world-model/')) for name in contents))
                 with redirect_stdout(io.StringIO()):
                     verify.verify(root, manifest, contents, archive, public_build=public)
                 chat['baseUrl'] = 'https://other.example.test'
@@ -278,21 +302,21 @@ class PackageTests(unittest.TestCase):
     def test_config_and_artifacts(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            source_manifest = json.loads((ROOT / 'manifest.json').read_text())
+            source_manifest = json.loads((ROOT / 'extension/manifest.json').read_text())
             for name in pack.runtime_files(source_manifest):
                 if name == 'runtime-config.js':
                     continue
-                target = root / name
+                target = pack.runtime_source(root, name)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(pack.runtime_source(ROOT, name).read_bytes())
             (root / '.env.local').write_text('MICROBURBS_API_BASE_URL=https://api.example.test\nMICROBURBS_API_KEY="dummy-key"\n')
             manifest, contents, archive = pack.build(root)
             self.assertEqual(manifest['host_permissions'], ['https://api.example.test/*'])
             self.assertIn('connect-src https://api.example.test', manifest['content_security_policy']['extension_pages'])
-            self.assertEqual(json.loads((root / 'manifest.json').read_text()), source_manifest)
+            self.assertEqual(json.loads((root / 'extension/manifest.json').read_text()), source_manifest)
             self.assertIn(b'dummy-key', contents['runtime-config.js'])
             self.assertFalse(any(name.endswith('.yaml') or '.env' in name or name.startswith('tests/') for name in contents))
-            self.assertFalse(any(name.startswith(("src/", ".build/", "node_modules/", ".agents/", ".tools/")) or name.endswith((".tsx", ".map")) for name in contents))
+            self.assertFalse(any(name.startswith(("extension/", "src/", ".build/", "node_modules/", ".agents/", ".tools/")) or name.endswith((".tsx", ".map")) for name in contents))
             self.assertIn(b'globalThis.DATA_API_CONFIG = Object.freeze({"baseUrl": ""})', contents['runtime-config.js'])
             self.assertIn("ui/injected.js", contents)
             self.assertIn("ui/selection-card.css", contents)
@@ -333,16 +357,16 @@ class PackageTests(unittest.TestCase):
     def test_data_api_origins_and_database_exclusion(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            manifest = json.loads((ROOT / 'manifest.json').read_text())
+            manifest = json.loads((ROOT / 'extension/manifest.json').read_text())
             for name in pack.runtime_files(manifest):
                 if name == 'runtime-config.js':
                     continue
-                target = root / name
+                target = pack.runtime_source(root, name)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(pack.runtime_source(ROOT, name).read_bytes())
             for name in ['api/health.ts', 'server/db/index.ts', 'drizzle/0000.sql',
                          'data/first.csv', 'data/second.csv', '.env.server.local']:
-                target = root / name
+                target = pack.runtime_source(root, name)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text('server-only-marker')
             env = root / '.env.local'

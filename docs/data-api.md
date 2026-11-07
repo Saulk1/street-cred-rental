@@ -119,8 +119,8 @@ no migration credential was persisted or added to the runtime fallback logic.
 4. Before public use, configure a Vercel Firewall rate-limit rule for `/api/*`
    at 60 requests per minute per IP, returning HTTP 429. Check feature availability
    and cost in your Vercel plan. No in-memory counter is used across functions.
-5. Confirm `/api/health` returns HTTP 200, and paths such as `/manifest.json`,
-   `/background.js`, `/runtime-config.js`, `/.env.local` and dataset CSV
+5. Confirm `/api/health` returns HTTP 200, and paths such as `/extension/manifest.json`,
+   `/extension/background.js`, `/extension/runtime-config.js`, `/.env.local` and `/data/` CSV
    paths return HTTP 404. Watch HTTP 503 counts in Vercel request metrics.
 
 Vercel's [function runtime](https://vercel.com/docs/functions/runtimes/node-js)

@@ -5,10 +5,10 @@ import vm from "node:vm";
 import { randomUUID } from "node:crypto";
 import { note, noteKey, storageMock } from "./helpers/storage.mjs";
 
-const source = await readFile(new URL("../background.js", import.meta.url), "utf8");
-const consts = await readFile(new URL("../consts.js", import.meta.url), "utf8");
-const apiSource = await readFile(new URL("../property-api.js", import.meta.url), "utf8");
-const reportScripts = Object.fromEntries(await Promise.all(['report-endpoints.js', 'report-plan.js', 'report-store.js', 'report-worker.js'].map(async name => [name, await readFile(new URL('../' + name, import.meta.url), 'utf8')])));
+const source = await readFile(new URL("../extension/background.js", import.meta.url), "utf8");
+const consts = await readFile(new URL("../extension/consts.js", import.meta.url), "utf8");
+const apiSource = await readFile(new URL("../extension/property-api.js", import.meta.url), "utf8");
+const reportScripts = Object.fromEntries(await Promise.all(['report-endpoints.js', 'report-plan.js', 'report-store.js', 'report-worker.js'].map(async name => [name, await readFile(new URL('../extension/' + name, import.meta.url), 'utf8')])));
 const welcomeURL = "chrome-extension://test-extension/welcome/welcome.html";
 
 function background(createTab = async () => ({ id: 1 }), store = storageMock(), menuFailure) {

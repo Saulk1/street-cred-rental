@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import vm from 'node:vm';
 import test from 'node:test';
 
-const sources = Object.fromEntries(await Promise.all(['report-endpoints.js', 'report-plan.js', 'report-worker.js'].map(async name => [name, await readFile(new URL('../' + name, import.meta.url), 'utf8')])));
+const sources = Object.fromEntries(await Promise.all(['report-endpoints.js', 'report-plan.js', 'report-worker.js'].map(async name => [name, await readFile(new URL('../extension/' + name, import.meta.url), 'utf8')])));
 const profile = { suburb: 'Surry Hills', mesh_block: '11201234567' };
 const selected = id => ({ id, label: id + ' example address' });
 const failure = (code, extra = {}) => Object.assign(new Error(code), { detail: { code, message: 'Safe ' + code, ...extra } });

@@ -4,10 +4,17 @@
 /.loci/
 /node_modules/
 /.build/
+# Local extension builds contain team credentials. Track only dist/public/.
+/dist/unpacked/
+/dist/microburbs-facts-*.zip
 __pycache__/
 .DS_Store
 .env
 .env.*
 /.vercel/
 .vercel
-.env*
+
+
+# Team-only rental source and artifacts
+/.private/
+/rental-world-model/

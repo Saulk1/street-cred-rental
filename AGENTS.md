@@ -45,6 +45,12 @@ Do not describe manual file reads as a successful CLI search.
 
 ## Extension packaging
 
+Extension source lives under `extension/`, with React source in `extension/src/`.
+The `@/` alias resolves to `extension/src/`. Keep installed Chrome resource URLs
+relative to the packaged root; `scripts/package.py` maps source paths into it.
+Reference datasets live in `data/`, the API specification in `docs/api/`,
+presentation assets in `docs/media/`, and all test data in `tests/fixtures/`.
+
 The UI uses React, TypeScript, Tailwind v4 and official shadcn Nova/Radix
 components. Read `.agents/skills/shadcn/SKILL.md` for shadcn work. Preserve the
 vanilla selection lifecycle controller and background/API message contracts.

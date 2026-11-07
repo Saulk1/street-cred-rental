@@ -6,10 +6,12 @@ The `microburbs/microburbs-facts` Vercel project uses Node.js 22, production
 server environment variables and a published 10-request/60-second per-IP limit
 for `POST /api/chat`.
 
-The extension's options page is a dedicated property chatbot, styled with the
-popup's blue palette, supplied Microburbs logo and rounded surfaces. Its native
-controls retain streaming, saved conversations, keyboard submission and expandable
-calculation details. The previous guide remains on the welcome page and side panel.
+The extension's options page is a dedicated property chatbot with the supplied
+Microburbs logo and shadcn conversation primitives. It retains streaming, saved
+conversations, keyboard submission and expandable calculation details. Rental
+questions and answer controls appear inside the scrolling conversation; only the
+latest rental result has active controls. Reopening restores a pending question
+in place. The previous guide remains on the welcome page and side panel.
 
 ## Configure a private team build
 
@@ -62,16 +64,18 @@ planning, schools, amenities and transport. It asks for clarification when
 addresses are ambiguous. Retrieved sources appear below each answer and are
 referenced as `[S1]`, `[S2]`, and so on, separately for each answer.
 
-The assistant also supports reviewed Python calculations, starting with a
-comparison of a user-stated weekly rent against the property's latest historical
-rental listing. Expand a `C1 · Rent comparison` row to inspect computed values,
-inputs, units, assumptions and limitations. See [Compute setup](property-compute.md)
-for the two server-only settings and how to add calculation modules.
+The assistant also supports a Python rental advisor: ask for rentals with a budget,
+area, bedroom count and any requirements. A dated private snapshot supplies up to
+three recommendations. Use its question options, custom answers and feedback to
+refine the search. Anonymous preferences persist in Neon for the session; the
+browser keeps its capability. See [Rental advisor setup](property-compute.md).
+The advisor asks up to two questions when a preference could materially change
+the result; sufficiently clear searches may receive recommendations immediately.
 
 Enter sends a message; Shift+Enter inserts a newline. IME composition does not
 send a message. Stop cancels the current request. Interrupted or failed replies
 remain marked incomplete, can be retried, and are excluded from future model
-context. New chat cancels pending work and deletes only this chat's local thread.
+context. New chat cancels pending work, clears this chat's local thread and ends its rental session.
 Closing or reloading the page preserves the conversation; reopening never resumes
 an old model request. Draft text is not saved.
 

@@ -1,5 +1,5 @@
 "use strict";
-// Derived from assets/microburbs-hackathon-api.yaml. Coverage is checked in tests/report-plan.test.mjs.
+// Derived from docs/api/microburbs-hackathon-api.yaml. Coverage is checked in tests/report-plan.test.mjs.
 globalThis.REPORT_ENDPOINTS = Object.freeze([
   {"path":"/v1/ping","title":"Health check","scope":"support","group":"Supporting catalogs","query":[],"description":"Returns immediately if the API is up. No authentication required and not metered — safe to poll from a load balancer, uptime monitor, or status dashboard without affecting your usage."},
   {"path":"/v1/me","title":"Me","scope":"support","group":"Supporting catalogs","query":[],"description":"Return the calling team and the hackathon area."},

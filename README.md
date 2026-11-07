@@ -16,8 +16,8 @@ Microburbs Facts is a Chrome extension with three connected tools:
   the background and keeps its results when the popup closes.
 - **Property assistant:** an options-page chatbot that retrieves property data,
   asks for missing information and streams answers with source references.
-  Its Python compute layer starts with a rent comparison: weekly and annual
-  differences and the percentage change from a historical asking rent.
+  Its Python rental advisor asks useful preference questions and recommends
+  three rentals from a dated private snapshot, with fair asking-rent estimates.
 - **Local notes:** save selected page text, property summaries or your own notes
   in the current Chrome profile.
 
@@ -27,7 +27,7 @@ registered calculation modules.
 
 ## Who it helps
 
-**Renters** can compare an asking amount with a historical listing and explore
+**Renters** can find rentals matching their preferences and explore
 transport, shops and other everyday amenities. **Home buyers** can inspect
 valuation estimates, nearby sales, zoning and mapped environmental context.
 Both can keep their research together and ask follow-up questions without
@@ -43,34 +43,22 @@ context rather than a planning certificate.
   sale and rental history, comparables, planning, schools, amenities, transport,
   overlays and suburb/regional datasets. Missing values remain distinguishable
   from zero and from failed requests.
-- **User responses:** explicit scenario inputs, such as the proposed weekly rent
-  and the period used by a historical rental listing. The API does not specify
-  that listing's rent period, so the assistant must ask rather than assume.
-- **Derived results:** the popup averages available lifestyle, convenience,
-  family, safety and tranquility scores, requiring at least three of the five.
-  Python calculates rent comparisons from verified API inputs and user-stated
-  parameters, with units and assumptions attached.
+- **User responses:** explicit budgets, bedroom counts, areas, requirements and feedback.
+- **Derived results:** a prototype suburb wellbeing average in the popup and
+  rental recommendations from a private fitted asking-rent model and listing snapshot.
 
-Notes, saved reports and the conversation stay in the Chrome profile. Chat
-messages and requested property data also travel to the backend and OpenAI;
-only the required calculation inputs go to Python. The CSV resources under
-`assets/` and the optional Neon database are separate from the current chatbot's
-data flow.
+Notes, saved reports and conversation text stay in Chrome. Chat messages and
+requested property data travel to the backend and OpenAI. Anonymous rental
+preferences are also persisted in Neon with session expiry. The energy dataset
+remains separate from property chat. Rental artifacts stay on the private backend.
 
 ## The clever step
 
-**The chatbot gathers and explains; Python does the calculation.** The model
-selects a named calculator, while the server fetches its required API data and
-checks user parameters against exact quotes from user messages. It passes a
-structured payload to a checked-in Python module, then returns an expandable
-calculation record containing the result, inputs, sources, units, assumptions
-and calculator version.
-
-That makes the arithmetic inspectable and repeatable. It also catches a subtle
-data problem: a historical rent amount cannot be compared with a weekly proposal
-until its period is known. The calculator asks for that information and converts
-weekly, fortnightly, monthly or yearly amounts consistently. New calculators
-join the same registry through a declared input/output contract.
+**The chatbot explains; Python plans and ranks.** The rental advisor simulates
+possible answers to decide which preference question would change the recommended
+homes. It asks up to two questions, recommends three different tradeoffs, and
+updates the search when the user answers or gives feedback. Source dates, fair
+asking-rent estimates, walking-distance uncertainty and limitations remain visible.
 
 ## How to run it
 
@@ -93,8 +81,8 @@ Use **Node.js 22.12+ within the 22.x release**, **Python 3.12** and desktop Chro
 
 To enable chat, deploy the backend with the server settings in
 [Chat setup](docs/property-chat.md), then set `DATA_API_BASE_URL` to its HTTPS
-origin and `CHAT_ACCESS_TOKEN` in the extension's `.env.local`. Python
-calculations additionally need these **server-only** settings:
+origin and `CHAT_ACCESS_TOKEN` in the extension's `.env.local`. The rental advisor additionally needs staged private artifacts and Neon session
+tables as described in [Compute setup](docs/property-compute.md), plus these **server-only** settings:
 
 | Setting | Purpose |
 | --- | --- |
@@ -110,7 +98,7 @@ For backend development, use `npm run dev:api` and `npm run dev:compute` in
 separate terminals, with `COMPUTE_API_URL=http://127.0.0.1:3001/api/compute` in
 local settings. These local commands test the backend; the installed extension
 requires an HTTPS chat origin. See [Compute setup](docs/property-compute.md) for
-the calculation contract and how to add Python modules.
+private artifact staging, session migration and the advisor contract.
 
 Run `npm run test:compute`, `npm run test:server`, `npm run test:ui`,
 `npm run typecheck` and `npm run typecheck:server` for the Python, backend and
@@ -168,7 +156,7 @@ guidance until rebuilt locally. Local packaging writes the configured extension
 to `dist/unpacked/` and embeds an inspectable copy of its key. Public packaging
 writes a separate key-free distribution to `dist/public/`. Share that public
 folder; keep `.env.local` and authenticated local output uncommitted.
-The root `runtime-config.js` is an empty source placeholder, never a place for keys.
+The source `extension/runtime-config.js` is an empty source placeholder, never a place for keys.
 The Python builder reads dotenv assignments without running shell code or expanding variables.
 
 Every property lookup (address search, core details and additional sections) uses
@@ -235,11 +223,11 @@ Use **Open options** in the popup to open or focus the options tab. You can also
 right-click the extension's toolbar icon and choose **Options**. The page opens the property assistant, with streaming answers, Microburbs lookups and one locally saved conversation. See [Chat setup](docs/property-chat.md) to configure the private team build. Use **Open side panel** to open the guide in
 the current browser window (Chrome 116 or newer).
 
-The property assistant also supports a server-side Python compute layer. Its
-first calculator compares a proposed weekly rent with the latest historical
-listing amount, after the user confirms that listing's rent period. Results
-include inspectable inputs, source references, units and assumptions. See
-[Compute setup and adding calculators](docs/property-compute.md).
+The property assistant also supports a server-side Python rental advisor with
+preference questions, three differentiated recommendations and fair asking-rent
+estimates from a dated private snapshot. It requires staged private artifacts,
+the new Neon session migration and compute credentials. See
+[Rental advisor setup](docs/property-compute.md).
 
 ### Full property report
 
@@ -365,19 +353,55 @@ including browser settings and the Chrome Web Store, from content script injecti
 
 ## UI development and runtime files
 
-- `src/`: React page/injected entries, typed view models, shared tokens and official
+The repository is organized by responsibility:
+
+```text
+extension/             Chrome extension source
+  src/                 React/TypeScript entries, components, hooks and styles
+  content-script/      Vanilla selection and widget lifecycle controllers
+  assets/              Bundled brand image
+  icons/               Chrome extension icons
+  popup/, options/, sidepanel/, welcome/   Extension page shells
+  manifest.json        Manifest template; worker and runtime modules sit beside it
+api/                   Vercel HTTP entry points (Node.js and Python)
+server/                Node.js services and Drizzle schemas
+compute/               Python rental advisor and computation registry
+shared/                Contracts shared by the extension and server
+drizzle/               SQL migrations and metadata
+data/                  Reference CSV datasets; never packaged or deployed
+docs/                  Setup and feature documentation
+  api/                 Microburbs OpenAPI specification
+  media/               Pitch video, artwork and screenshots
+  store/               Chrome Web Store listing and capture
+reports/               Historical evaluation reports and their HTML viewer
+tests/                 Controller, UI, server, Python and packaging checks
+  fixtures/            Shared mock data, preview pages and world-model scenarios
+scripts/               Build, packaging, verification and development commands
+.build/                Ignored compiled intermediates
+dist/                  Generated unpacked extensions and ZIPs
+```
+
+- `extension/src/`: React page/injected entries, typed view models, shared tokens and official
   shadcn components. `components.json` records the Nova/Radix/Lucide configuration.
-- `content-script/`: selection/widget lifecycle controllers and host-only CSS.
+- `extension/content-script/`: selection/widget lifecycle controllers and host-only CSS.
   React renders controls/results inside isolated shadow roots. Native popover and
   fixed-position fallback behavior are retained.
-- `background.js`, `property-api.js`, `consts.js`: existing worker, API and message
-  contracts. Storage keys and note formats are unchanged.
+- `extension/background.js`, `extension/property-api.js`, `extension/consts.js`
+  and `extension/report-*.js`: worker, API, message and report contracts.
+- `@/` resolves to `extension/src/` in TypeScript, Vite, Vitest and shadcn.
 
 `npm run build` creates local self-contained scripts and styles under `.build/`.
 `python3 scripts/package.py` builds them and writes `dist/unpacked/` and the ZIP.
-The root source directory is no longer a loadable extension; load `dist/unpacked/`.
+Load `dist/unpacked/` in Chrome; `extension/` contains uncompiled source.
+The packager maps that source to the existing installed paths, so manifest URLs,
+worker imports, storage keys and browser entry points remain stable.
 The allowlist excludes TypeScript, source maps, npm dependencies, skills and tools.
 Only bundled local assets run in Chrome, with the existing CSP and permissions.
+
+The [historical report viewer](reports/report.html) lives beside its JSON evidence.
+Recorded source paths and fingerprints in historical reports describe the files
+at the time of the run. Presentation assets are in `docs/media/`, including
+[the pitch video](docs/media/pitch.mp4).
 
 For a mock-data property preview, run `npm run build`, serve the repository with
 `python3 -m http.server 8766 --bind 127.0.0.1`, and open
@@ -594,7 +618,7 @@ tab, native-menu selection snapshots, stale requests and legacy URL-note display
 This is an installable extension shell, not a feature-complete product. Its current
 functionality may be rejected under Chrome Web Store's minimum functionality requirements.
 Add useful functionality before seeking public approval. Nothing has been submitted
-or published. See `store/listing.md` for accurate draft copy and preparation steps.
+or published. See `docs/store/listing.md` for accurate draft copy and preparation steps.
 
 ## Expanded property card verification
 
@@ -742,7 +766,7 @@ Escape dismissal, a clean popup-page console, and readable content at 200% page
 zoom. The heading's text contrast is 11.24:1. All four PNG dimensions and manifest
 references were checked, and the ZIP's runtime files match the source.
 
-`store/popup-screenshot.png` is a 1280 × 800 capture of the installed extension's
+`docs/store/popup-screenshot.png` is a 1280 × 800 capture of the installed extension's
 popup document opened directly in a tab at 100% zoom and device pixel ratio 1.
 It predates the launcher buttons and needs replacing before submission.
 It contains no browser chrome or account details.

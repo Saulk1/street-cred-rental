@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import test from "node:test";
-const source = await readFile(new URL("../property-api.js", import.meta.url), "utf8");
+const source = await readFile(new URL("../extension/property-api.js", import.meta.url), "utf8");
 const config = { baseUrl: "https://api.example.test", apiKey: "test-only-key" };
 const manifest = { host_permissions: [config.baseUrl + "/*"],
   content_security_policy: { extension_pages: "default-src 'none'; connect-src " + config.baseUrl } };
@@ -157,7 +157,7 @@ test("network failures, invalid JSON and timeouts have safe retryable messages",
   assert.equal((await pending).error.code, "timeout");
 });
 
-// Field shapes derived from assets/microburbs-hackathon-api.yaml; all values
+// Field shapes derived from docs/api/microburbs-hackathon-api.yaml; all values
 // below are invented fixture data and never use the team's API credentials.
 const extraFixture = JSON.parse(await readFile(new URL('./fixtures/property-sections.json', import.meta.url), 'utf8'));
 test('extra sections use fixed YAML endpoint paths and normalize only display fields', async () => {

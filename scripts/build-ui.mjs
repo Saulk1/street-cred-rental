@@ -14,7 +14,7 @@ for (const entry of ['pages', 'injected']) {
       outDir: '.build/' + entry,
       emptyOutDir: true,
       sourcemap: false,
-      lib: { entry: resolve(root, `src/${entry}.tsx`), name: entry === 'injected' ? 'MicroburbsUI' : 'MicroburbsPages', formats: ['iife'], fileName: () => `${entry}.js`, cssFileName: entry },
+      lib: { entry: resolve(root, `extension/src/${entry}.tsx`), name: entry === 'injected' ? 'MicroburbsUI' : 'MicroburbsPages', formats: ['iife'], fileName: () => `${entry}.js`, cssFileName: entry },
 
     },
   });
@@ -37,6 +37,6 @@ theme += `\n@layer base{:host,:host *, :host *::before, :host *::after{${default
 // while retaining browser zoom and avoiding page CSS changing control geometry.
 theme = theme.replace(/(-?[\d.]+)rem\b/g, (_, value) => `${Number(value) * 16}px`);
 for (const [source, target] of [['selection-card.css', 'selection-card.css'], ['content-script.css', 'widget.css']]) {
-  const host = await readFile(resolve(root, 'content-script', source), 'utf8');
+  const host = await readFile(resolve(root, 'extension/content-script', source), 'utf8');
   await writeFile(resolve(output, target), theme + '\n' + host);
 }

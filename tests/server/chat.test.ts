@@ -2,11 +2,12 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { chat } from '../../server/chat';
 import { execFileSync } from 'node:child_process';
 
-const { create } = vi.hoisted(() => ({ create: vi.fn() }));
+const { create, rentalAction } = vi.hoisted(() => ({ create: vi.fn(), rentalAction: vi.fn() }));
+vi.mock('../../server/rental', () => ({ rentalCommand: rentalAction }));
 vi.mock('openai', () => ({ default: class { responses = { create }; } }));
 
 beforeEach(() => {
-  create.mockReset();
+  create.mockReset(); rentalAction.mockReset();
   vi.stubEnv('CHAT_ACCESS_TOKEN', 'dummy-team-token');
   vi.stubEnv('OPENAI_API_KEY', 'dummy-provider-key');
   vi.stubEnv('OPENAI_MODEL', 'test-model');
@@ -126,33 +127,44 @@ it('propagates client cancellation to the active provider request', async () => 
   expect(providerSignal!.aborted).toBe(true);
 });
 
-it('completes search, real Python computation and explanation within the existing tool budget', async () => {
-  const input = { id: 'GANSW1', inputs: { weekly_rent_aud: { value: 750, quote: '$750 per week', message_index: 0 }, reference_period: { value: 'week', quote: 'The historical listing was weekly.', message_index: 0 } } };
-  create.mockResolvedValueOnce(stream(completed([call('search_address', { address: '26 Tudor Street' })])))
-    .mockResolvedValueOnce(stream(completed([call('compute_rent_comparison', input)])))
-    .mockResolvedValueOnce(stream({ type: 'response.output_text.delta', delta: 'The proposed rent is $30/week above the historical asking rent [S2] [C1].' }, completed()));
-  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
-    if (String(url).includes('compute.example')) {
-      const body = execFileSync('python3', ['-c', 'import json,sys; from compute.registry import run; print(json.dumps(run(json.load(sys.stdin))))'], { input: init!.body as string });
-      return Response.json(JSON.parse(body.toString()));
-    }
-    return Response.json({ data: String(url).includes('geocode') ? [{ id: 'GANSW1' }] : { price: 720, type: 'For Rent', date: '2025-07-24', address: '26 Tudor Street' } });
-  });
-  const result = await events(await chat(request([{ role: 'user', content: 'Compare $750 per week for 26 Tudor Street. The historical listing was weekly.' }])));
-  expect(create).toHaveBeenCalledTimes(3);
-  expect(fetcher).toHaveBeenCalledTimes(3);
-  expect(result.find(e => e.type === 'calculation')?.calculation).toMatchObject({ id: 'C1', version: '1.0.0', metrics: [{ value: 720 }, { value: 30 }, { value: 1560 }, { value: 4.17 }] });
-  expect(result.at(-1)).toEqual({ type: 'done' });
-  expect(JSON.stringify(result)).not.toContain('dummy-');
+
+it('does not expose the removed historical rent calculator', async () => {
+  create.mockResolvedValue(stream({ type: 'response.output_text.delta', delta: 'Hello' }, completed()));
+  await events(await chat(request()));
+  const names = create.mock.calls[0][0].tools.map((tool: any) => tool.name);
+  expect(names).toContain('compute_rental_advisor');
+  expect(names).not.toContain('compute_rent_comparison');
 });
 
-it('turns missing calculation inputs into a follow-up question without contacting Python', async () => {
-  create.mockResolvedValueOnce(stream(completed([call('compute_rent_comparison', { id: 'GANSW1', inputs: { weekly_rent_aud: { value: null, quote: null, message_index: null }, reference_period: { value: null, quote: null, message_index: null } } })])))
-    .mockResolvedValueOnce(stream({ type: 'response.output_text.delta', delta: 'What weekly rent in AUD would you like to compare?' }, completed()));
-  const fetcher = vi.spyOn(globalThis, 'fetch');
-  const result = await events(await chat(request()));
-  expect(fetcher).not.toHaveBeenCalled();
-  const supplied = create.mock.calls[1][0].input.find((item: any) => item.type === 'function_call_output');
-  expect(JSON.parse(supplied.output)).toMatchObject({ status: 'needs_input', missing: [{ key: 'weekly_rent_aud' }, { key: 'reference_period' }] });
-  expect(result.at(-1)).toEqual({ type: 'done' });
+it('runs one advisor command using the actual user message and streams its structured result', async () => {
+  const { rentalQuestion } = await import('../fixtures/rental');
+  rentalAction.mockResolvedValue(rentalQuestion);
+  create.mockResolvedValueOnce(stream(completed([call('compute_rental_advisor', {})])))
+    .mockResolvedValueOnce(stream({type:'response.output_text.delta',delta:'Please answer the rental question.'},completed()));
+  const context={token:'b'.repeat(64),revision:0};
+  const response=await chat(new Request('https://test/api/chat',{method:'POST',headers:{Authorization:'Bearer dummy-team-token','Content-Type':'application/json'},
+    body:JSON.stringify({messages:[{role:'user',content:'Find a rental under $800'}],rental:context,eventId:'user-message-1'})}));
+  const output=await events(response);
+  expect(output.find(e=>e.type==='rental_result')?.rental).toEqual(rentalQuestion);
+  expect(rentalAction).toHaveBeenCalledExactlyOnceWith(context,'user-message-1',{operation:'start',text:'Find a rental under $800'},expect.any(AbortSignal),expect.any(Number));
+  expect(JSON.stringify(output)).not.toContain(context.token);
+  expect(create).toHaveBeenCalledTimes(2);
+});
+
+it('sends a pending-question answer to the same rental session and streams the next result', async () => {
+  const { rentalQuestion, rentalRecommendation } = await import('../fixtures/rental');
+  rentalAction.mockResolvedValue(rentalRecommendation);
+  create.mockResolvedValueOnce(stream(completed([call('compute_rental_advisor', {})])))
+    .mockResolvedValueOnce(stream({type:'response.output_text.delta',delta:'Here are your rental matches.'},completed()));
+  const context = { token:'b'.repeat(64), revision:1 };
+  const response = await chat(new Request('https://test/api/chat', { method:'POST',
+    headers:{ Authorization:'Bearer dummy-team-token', 'Content-Type':'application/json' },
+    body:JSON.stringify({ messages:[{role:'user',content:'Find a rental under $800'},
+      {role:'assistant',content:rentalQuestion.result.question_text}, {role:'user',content:'Yes, I have pets'}],
+      rental:context, eventId:'answer-message-2' }) }));
+  const output = await events(response);
+  expect(rentalAction).toHaveBeenCalledExactlyOnceWith(context, 'answer-message-2',
+    { operation:'message', text:'Yes, I have pets' }, expect.any(AbortSignal), expect.any(Number));
+  expect(output.find(e => e.type === 'rental_result')?.rental).toEqual(rentalRecommendation);
+  expect(output.at(-1)).toEqual({type:'done'});
 });

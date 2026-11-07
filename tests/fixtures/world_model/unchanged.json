@@ -1,0 +1,66 @@
+{
+  "fixture_id": "unchanged",
+  "data_mode": "demo",
+  "notice": "演示数据，不是真实在租房源；仅用于复现三分支一致。",
+  "description": "A 距站 200 米，三个分支都选 A，应直接交回原推荐流程。",
+  "request": {
+    "session_id": "demo-session-001",
+    "search_id": "search-001",
+    "state_version": 3,
+    "candidate_snapshot_id": "candidates-003",
+    "ranker_snapshot_id": "ranker-007",
+    "station_walk": {
+      "status": "unknown",
+      "max_m": null
+    },
+    "asked_question_keys": [],
+    "user_state": {
+      "budget_weekly_max": 750,
+      "bedrooms": null,
+      "districts": [],
+      "soft_preferences": {
+        "emphasis": "groceries"
+      },
+      "other_confirmed": {
+        "pets_allowed": false
+      }
+    },
+    "candidates": [
+      {
+        "listing_id": "A",
+        "weekly_rent": 720,
+        "supermarket_walk_min": 2,
+        "station_walk_m": 200,
+        "distance_kind": "walking",
+        "source": "demo",
+        "collected_at": "2026-11-06T00:00:00Z"
+      },
+      {
+        "listing_id": "B",
+        "weekly_rent": 740,
+        "supermarket_walk_min": 6,
+        "station_walk_m": 250,
+        "distance_kind": "walking",
+        "source": "demo",
+        "collected_at": "2026-11-06T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "action": "recommend",
+    "reason_code": "all_branches_agree",
+    "question_key": null,
+    "option_ids": [],
+    "branch_tops": {
+      "station-le-400": "A",
+      "station-le-1000": "A",
+      "station-no-limit": "A"
+    },
+    "feasible_counts": {
+      "station-le-400": 2,
+      "station-le-1000": 2,
+      "station-no-limit": 2
+    },
+    "divergence": 0
+  }
+}

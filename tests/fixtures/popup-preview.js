@@ -23,7 +23,7 @@ const report = {
 const listeners = new Set();
 const notes = {};
 globalThis.chrome = {
-  runtime: { getURL: path => '../../' + path, openOptionsPage: async () => {}, sendMessage: async message => message.type === 'REPORT_READ' ? { ok: true, report: location.search.includes('empty') ? null : report } : { ok: true, result: { data: payloads[message.taskId] } } },
+  runtime: { getURL: path => '../../extension/' + path, openOptionsPage: async () => {}, sendMessage: async message => message.type === 'REPORT_READ' ? { ok: true, report: location.search.includes('empty') ? null : report } : { ok: true, result: { data: payloads[message.taskId] } } },
   windows: { getCurrent: async () => ({ id: 7 }) }, sidePanel: { open: async () => {} }, tabs: { query: async () => [{ id: 1 }], sendMessage: async () => ({ ok: true }) },
   storage: { local: { get: async () => ({ ...notes }), set: async items => { Object.assign(notes, items); listeners.forEach(fn => fn(items, 'local')); }, remove: async key => { delete notes[key]; listeners.forEach(fn => fn({ [key]: {} }, 'local')); } }, onChanged: { addListener: fn => listeners.add(fn), removeListener: fn => listeners.delete(fn) } },
 };

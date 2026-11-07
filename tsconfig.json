@@ -9,8 +9,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noEmit": true,
-    "paths": { "@/*": ["./src/*"] },
+    "paths": { "@/*": ["./extension/src/*"] },
     "types": ["chrome", "node", "vite/client"]
   },
-  "include": ["src", "vite.config.mts"]
+  "include": ["extension/src", "vite.config.mts"]
 }

@@ -1,3 +1,4 @@
+import type { RentalReply } from './rental.js';
 import type { Calculation } from './compute.js';
 
 export type ChatInput = { role: 'user' | 'assistant'; content: string };
@@ -7,6 +8,7 @@ export type ChatEvent =
   | { type: 'tool'; id: string; label: string; status: 'running' | 'done' | 'error' }
   | { type: 'source'; source: ChatSource }
   | { type: 'calculation'; calculation: Calculation }
+  | { type: 'rental_result'; rental: RentalReply }
   | { type: 'done' }
   | { type: 'error'; code: string; message: string };
 
@@ -16,6 +18,7 @@ export type ChatMessage = ChatInput & {
   state: 'complete' | 'incomplete';
   sources: ChatSource[];
   calculations?: Calculation[];
+  rental?: RentalReply;
 };
 
 export function validHistory(value: unknown): value is ChatInput[] {

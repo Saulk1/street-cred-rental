@@ -1,122 +1,116 @@
-# Python calculations in property chat
+# Rental advisor compute service
 
-The options chatbot can call reviewed Python calculators using Microburbs data
-and explicit user responses. The first calculator, `rent_comparison` version
-`1.0.0`, compares a proposed weekly rent with the property's **latest historical
-asking rent**. The API does not specify that historical amount's rent period,
-so the user must confirm it. It does not estimate today's market rent.
+The chat's `compute_rental_advisor` tool executes the reviewed Python package in
+`compute/world_model`. It replaces the historical rent-comparison calculator.
+Historical source observations and the popup's independent manual comparison remain.
+Saved legacy calculation records remain readable, but cannot execute the retired tool.
 
-Example: “Compare $750 per week for 26 Tudor Street, Surry Hills. The historical
-listing amount is weekly.” Search resolves
-the address, the chat server retrieves `/rent-history-latest`, and Python computes
-the weekly difference, 52-week annual difference and percentage difference. If
-the proposed weekly amount or historical listing period is missing, the chatbot
-asks for it. Historical amounts can be weekly, fortnightly, monthly or yearly;
-conversions use 52 weeks, 26 fortnights or 12 months per year. Missing or invalid API
-rent is reported as unavailable, never substituted with zero or example data.
+## Behavior
 
-## Flow and boundaries
+The advisor extracts explicit English or Chinese preferences, ranks a private
+rental snapshot, asks up to two useful questions, and recommends up to three
+homes with different tradeoffs. Users can answer with an option or custom text,
+skip questions, add requirements, choose a home, reject one, or explain feedback.
+Rejected homes remain excluded for that search; feedback otherwise adjusts soft
+weights using the supplied model's rules. Unknown features remain unknown.
+No requirement is automatically relaxed. Ordinary property chat still uses live
+Microburbs lookups and works independently of the advisor.
 
-`src/chat.tsx` → `POST /api/chat` → named `compute_*` tool → `server/compute.ts`
-→ existing `server/property.ts` client → `POST /api/compute` → reviewed Python
-module → structured calculation event → chatbot explanation.
+Ranking uses `ValueRanker`, a 60-candidate pool, and a question-value threshold
+of three points. The demo FixedRanker is not used by the production adapter.
+Walking distances use the supplied straight-line detour estimates and uncertainty
+bands. Fair rent models asking prices, not signed leases. Snapshot listings are
+not evidence of current availability. Heuristic priors and weights are not
+calibrated satisfaction probabilities; source evaluation results are offline tests.
 
-The model chooses a registered tool and supplies numeric or enumerated user parameters with an
-exact quote and zero-based index of the supporting user message in that request.
-The server checks the quote contains the supplied number or a recognized term
-for the selected enum value and comes from a user,
-not an assistant. This verifies literal support, not the semantic meaning of the
-quote; instructions require clarification for unclear units or conflicting values.
-Only necessary validated parameters and normalized API fields go to Python, not
-the whole conversation or any provider/API credentials.
+## Private artifacts
 
-The server fetches API values itself. Tool schemas accept no API values, file
-paths, URLs or source code. The existing per-turn address search guard applies
-to data retrieval, including calculations. A calculation fetch uses the same
-125ms API spacing and Retry-After handling. Successful reads are deduplicated
-within the turn and receive source IDs and retrieval timestamps.
+Run `npm run rental:stage -- ./rental-world-model/data` after placing the supplied
+folder in the repo, or pass any local directory containing `fair_rent_model.json`
+and `for_rent_snapshot.json`. The staging script writes those two files and a
+SHA-256 manifest to ignored `.private/rental/`. The imported source package lives
+under `compute/`; the original `rental-world-model/` folder is ignored.
 
-Only the latest single rental record is needed for this first calculator; no
-truncated arrays are used. The current chat property client caps some list
-datasets at 50 rows. Any future aggregate calculator must add a dedicated adapter
-with pagination and explicit completeness checks before using those lists.
+Private backend deployments explicitly include `.private/rental/*.json`. Stage
+before deploying from the local working tree; a Git-only deployment must provide
+these private files separately before packaging the Python function. Refreshing
+requires staging a new matching model/snapshot and deploying together. No fitting,
+network retrieval, or enrichment runs within a compute request. The Python worker
+validates the manifest, hashes, dates and model version, then caches immutable
+artifacts per warm worker. Missing or inconsistent files produce unavailable.
+The runtime allowlist excludes all artifacts and Python code from both local and
+public extension packages. Do not publish the original dataset or model JSON.
 
-Calculation records (`C1`, etc., separately numbered per assistant answer) hold
-the calculator/version, property ID, exact user input and quote, API input
-snapshot/source IDs/timestamps, metrics with units, assumptions and limitations.
-The UI validates and renders these through expandable Trace rows. They survive
-reopening the chat. The existing `property-chat:v1` key is extended additively:
-older messages lacking `calculations` load with an empty array. New requests still
-send only complete user/assistant text; stored results are not trusted as fresh
-API facts in later turns. New chat removes the records with the conversation.
+## Configuration and persistence
 
-## Configuration
+Set `COMPUTE_API_URL` to the exact HTTPS `/api/compute` URL and
+`COMPUTE_SERVICE_TOKEN` to a separate random token of at least 32 printable ASCII
+characters on both Node and Python. For local development only, the URL may be
+`http://127.0.0.1:3001/api/compute`; use `npm run dev:compute` and `npm run dev:api`.
+These settings never belong in the extension. Keep the existing chat/team settings.
 
-Server-only variables, supplied to the backend deployment:
+Rental sessions use a separate server-only `COMPUTE_DATABASE_URL` with
+SELECT/INSERT/UPDATE/DELETE on `rental_sessions` and `rental_events`.
+The main data API and its health check continue to use `DATABASE_URL` from
+`.env.local`. Neither connection falls back to the other. Run `npm run db:migrate:compute` to apply only the rental-table migrations
+under `drizzle/compute/` to that connection. The main database keeps its existing
+`npm run db:migrate` workflow. Builds and requests do not run migrations.
+Migrations run only through the explicit migration command; deployment remains a separate step.
 
-| Variable | Value |
-| --- | --- |
-| `COMPUTE_API_URL` | Exact deployed HTTPS URL ending `/api/compute`, e.g. `https://microburbs-facts.vercel.app/api/compute` |
-| `COMPUTE_SERVICE_TOKEN` | A separate random token, at least 32 printable non-whitespace ASCII characters; use the same value for the Node and Python functions |
+A random 256-bit capability in Chrome identifies each anonymous session. The
+server stores only its hash. Sessions expire after 30 minutes of inactivity;
+expired sessions and cascading events are pruned when a new session starts.
+For physical deletion without traffic, schedule the equivalent expiry DELETE in
+Neon. Requests cannot read expired sessions. New chat ends its session; failed
+cleanup is handled by expiry. Browser storage holds the capability and pending
+command, allowing a lost response to be retried with the same event ID.
 
-Generate a token with `openssl rand -hex 32`. Do not reuse the extension's team
-token. These settings never belong in extension runtime configuration. Compute
-is optional: missing settings leave ordinary chat/property lookups working and
-produce a clear error only when a calculation is requested.
+Node owns authentication, database writes, optimistic revision checks and event
+idempotency. Python receives one validated command and serialized state and
+returns updated state plus display data. SQL commits state and event output in
+one statement. Simulation changes only copies. Conflicting answers require resume;
+stale question IDs cannot update the profile. A session pins its artifact version;
+a deployment changing it asks the user to start a new search.
 
-The existing file-based Vercel project deploys `api/compute.py` using Python 3.12
-and a standard-library HTTP handler. There are no additional Python packages.
-`pyproject.toml` pins the Python minor version. No Python framework preset is
-introduced, preserving the existing TypeScript API routes. `.vercelignore`
-includes the calculator package and excludes local secrets, datasets and bytecode.
-The extension packager's explicit runtime allowlist excludes all Python sources,
-contracts and server credentials.
+## Interfaces and bounds
 
-For local development, add the variables to `.env.local`, using
-`COMPUTE_API_URL=http://127.0.0.1:3001/api/compute`, then run `npm run dev:compute`
-and `npm run dev:api` in separate terminals. The development launcher loads the
-same dotenv file as the Node server. Plain HTTP is accepted only for loopback
-outside production. Deploy and configure both functions together so their
-calculator versions match. Restrict the compute route to POST and apply an
-appropriate deployment rate limit alongside the existing chat rule.
+- `POST /api/rental`: existing chat bearer authentication; JSON `{context, eventId,
+  command}`. Context contains token and revision. Commands: start/message with text,
+  resume, answer with questionId and optionId **or** text, feedback with chosenId,
+  rejectedIds/reasons, and end. Responses contain revision and structured result,
+  or `{ended:true}`. Errors use 400 validation, 401 authentication, 409 conflict or
+  changed snapshot, 410 expired session, and 503 unavailable.
+- `POST /api/chat`: optional rental context and stable user-message eventId.
+  The model's advisor tool has no arguments: Node supplies the actual last user
+  message. Results stream as `rental_result`, with no session capability included.
+- `POST /api/compute`: separate service bearer token; versioned `rental_advisor`
+  command, state, artifactVersion and deadlineMs. It accepts no caller-chosen paths,
+  datasets, source code or import names. Retired calculator IDs are rejected.
 
-## Execution limits
+Compute keeps the 8-second HTTP timeout and 64 KB input/output limits; the Python
+platform maximum remains 10 seconds. Chat retains four model rounds, six tool
+executions and 55 seconds, with five seconds reserved for explanation. One advisor
+command needs one Python call and no live API fan-out. Node validates outputs
+before committing. Errors retain only reviewed categories; diagnostics log
+versions, action, reason, duration and revision without messages or capabilities.
 
-The chat retains four model rounds, six tool executions and a 55-second overall
-deadline. Search → compute → explanation needs three rounds. The compute tool
-requests only its declared API datasets and reserves at least five seconds for
-the final explanation. Calls to Python have an eight-second maximum timeout,
-64 KB response limit, no redirects and no retries. The Python function has a
-10-second platform maximum and checks the supplied deadline before and after
-execution; longer algorithms must check their context deadline periodically.
+## Verification
 
-Stop/disconnect propagates to the Node compute HTTP request. Aborting HTTP does
-not guarantee immediate termination of remote CPU work: Python enforces its own
-deadline, backed by the platform maximum. Keep modules bounded, deterministic
-and free of network/file writes. Longer work needs a separate job/status design.
-
-## Add another calculator
-
-1. Add `compute/calculators/<name>.py` exposing
-   `calculate(inputs, datasets, context)`; return `status`, `metrics`,
-   `assumptions` and `warnings`, or an explicit `unavailable` result.
-2. Add its descriptor to `compute/catalog.json`: ID, version, description,
-   numeric user-input fields/ranges/units or enum options/evidence terms,
-   required datasets and exact ordered output metrics. The first implementation
-   supports numeric and enumerated user parameters
-   and small flat record datasets. Extend both boundary validators if new
-   types or dataset shapes are needed.
-3. Statically import and register the function in `compute/registry.py`.
-   Filenames/import paths never come from callers. Node builds strict model-tool
-   schemas from the catalog, avoiding a second handwritten tool definition.
-4. Add numerical fixtures and adapter tests; document completeness, units,
-   rounding and assumptions. Bump the version whenever formulas or contracts
-   change. Deploy the Node and Python functions together.
-
-Tests: `npm run test:compute`, `npm run test:server -- tests/server/compute.test.ts
-tests/server/chat.test.ts tests/server/property.test.ts`, and `npm run test:ui --
-tests/ui/chat.test.tsx tests/ui/chat-client.test.tsx`. Server tests run real Python
-with dummy API fixtures; no external services or credentials are required.
-
-The browser fixture at `tests/fixtures/chat-preview.html?compute` displays invented
-calculation data for visual/keyboard verification. It never calls a live service.
+Run `npm run test:compute`, `npm run test:server`, `npm run test:ui`,
+`npm run typecheck`, `npm run typecheck:server`, and `npm run test:package`.
+To verify the configured compute database with a disposable session, run
+`TEST_COMPUTE_DATABASE=1 npm run test:server -- tests/server/compute-database.integration.test.ts`.
+For a live two-turn chat → Python HTTP → Neon verification, run
+`TEST_LIVE_RENTAL_CHAT=1 npm run test:server -- tests/server/chat-live.integration.test.ts`.
+It uses the configured OpenAI model, a temporary authenticated local compute service,
+and one disposable session that is deleted afterward; private artifacts must be staged.
+Source tests use synthetic fixtures. The private-artifact adapter smoke test skips
+when artifacts are absent. Real Neon tests require explicit development settings. The isolated SQL test uses
+`TEST_RENTAL_LOCAL_PG_PATH=/private/tmp/microburbs-rental-pg` with a disposable
+PostgreSQL socket on port 55441 after applying the session migration. The local
+HTTP test uses `TEST_COMPUTE_HTTP_URL=http://127.0.0.1:3001/api/compute` and the
+fixed dummy token documented in its test; never use that token in a deployment.
+Use `tests/fixtures/chat-preview.html?rental` for invented browser demonstration data.
+The historical evaluation files under `reports/` describe the retired version;
+they do not validate this advisor integration. `scripts/heldout-check.py` now runs
+advisor acceptance checks without rewriting those historical reports.

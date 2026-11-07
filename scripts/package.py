@@ -79,8 +79,13 @@ def build_ui(root):
 
 
 def runtime_source(root, name):
-    compiled = root / ".build/runtime" / name
-    return compiled if name.startswith("ui/") and compiled.exists() else root / name
+    # Source layout and installed extension paths are intentionally independent.
+    # Keep Chrome URLs stable while taking runtime inputs only from extension/.
+    if name == "LICENSE":
+        return root / name
+    if name.startswith("ui/"):
+        return root / ".build/runtime" / name
+    return root / "extension" / name
 
 
 def distribution_directory(root, *, public_build=False):
@@ -88,7 +93,7 @@ def distribution_directory(root, *, public_build=False):
 
 
 def build(root, config_path=None, *, public_build=False):
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((root / "extension/manifest.json").read_text(encoding="utf-8"))
     config = read_config(config_path or root / ".env.local")
     origins = list(dict.fromkeys(origin for origin in (config["baseUrl"], config["dataApiBaseUrl"]) if origin))
     if origins:

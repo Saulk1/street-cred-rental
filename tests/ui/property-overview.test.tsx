@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PropertyOverview } from '../../src/property-overview';
-import type { ReportSnapshot } from '../../src/property-report';
+import { PropertyOverview } from '../../extension/src/property-overview';
+import type { ReportSnapshot } from '../../extension/src/property-report';
 
 let report: ReportSnapshot;
 let payloads: Record<string, unknown>;

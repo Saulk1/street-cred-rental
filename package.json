@@ -15,12 +15,15 @@
     "typecheck:server": "tsc --project tsconfig.server.json --noEmit",
     "dev:api": "node --env-file-if-exists=.env.local ./node_modules/vercel/dist/vc.js dev --listen 3000",
     "dev:compute": "node scripts/dev-compute.mjs",
-    "test:compute": "python3 -m unittest discover -s tests -p 'compute_test.py'",
+    "test:compute": "python3 -m unittest discover -s tests -p 'compute_test.py' && python3 -m unittest discover -s tests/world_model -p 'test_*.py'",
     "test:server": "vitest run --config vitest.server.config.mts",
     "db:generate": "node --env-file-if-exists=.env.local ./node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file-if-exists=.env.local ./node_modules/drizzle-kit/bin.cjs migrate",
     "test:ui": "vitest run",
-    "test:package": "python3 scripts/verify-package.py"
+    "test:package": "python3 scripts/verify-package.py",
+    "rental:stage": "python3 scripts/stage-rental.py",
+    "db:generate:compute": "node --env-file-if-exists=.env.local ./node_modules/drizzle-kit/bin.cjs generate --config drizzle.compute.config.ts",
+    "db:migrate:compute": "node --env-file-if-exists=.env.local ./node_modules/drizzle-kit/bin.cjs migrate --config drizzle.compute.config.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",

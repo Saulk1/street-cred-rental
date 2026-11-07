@@ -1,0 +1,60 @@
+{
+  "fixture_id": "missing_data",
+  "data_mode": "demo",
+  "notice": "演示数据，不是真实在租房源；用于复现距离缺失时必须停止模拟。",
+  "description": "B 的到站步行距离缺失，不得补 0、不得猜值，应返回 needs_data + data_missing。",
+  "request": {
+    "session_id": "demo-session-001",
+    "search_id": "search-001",
+    "state_version": 3,
+    "candidate_snapshot_id": "candidates-003",
+    "ranker_snapshot_id": "ranker-007",
+    "station_walk": {
+      "status": "unknown",
+      "max_m": null
+    },
+    "asked_question_keys": [],
+    "user_state": {
+      "budget_weekly_max": 750,
+      "bedrooms": null,
+      "districts": [],
+      "soft_preferences": {
+        "emphasis": "groceries"
+      },
+      "other_confirmed": {
+        "pets_allowed": false
+      }
+    },
+    "candidates": [
+      {
+        "listing_id": "A",
+        "weekly_rent": 720,
+        "supermarket_walk_min": 2,
+        "station_walk_m": 900,
+        "distance_kind": "walking",
+        "source": "demo",
+        "collected_at": "2026-11-06T00:00:00Z"
+      },
+      {
+        "listing_id": "B",
+        "weekly_rent": 740,
+        "supermarket_walk_min": 6,
+        "station_walk_m": null,
+        "distance_kind": "walking",
+        "source": "demo",
+        "collected_at": "2026-11-06T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "action": "needs_data",
+    "reason_code": "data_missing",
+    "question_key": null,
+    "option_ids": [],
+    "branch_tops": {},
+    "feasible_counts": {},
+    "data_problems": [
+      "missing_station_walk:B"
+    ]
+  }
+}

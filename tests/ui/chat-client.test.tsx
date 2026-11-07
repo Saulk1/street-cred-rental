@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { receiveChat, readThread, contextFor } from '../../src/lib/chat';
+import { receiveChat, readThread, contextFor } from '../../extension/src/lib/chat';
 import { calculation } from '../fixtures/calculation';
 
 const history = [{ id: 'user', role: 'user' as const, content: '你好', state: 'complete' as const, sources: [] }];

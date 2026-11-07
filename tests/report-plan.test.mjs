@@ -4,14 +4,14 @@ import vm from 'node:vm';
 import test from 'node:test';
 
 const context = vm.createContext({ URLSearchParams });
-for (const name of ['report-endpoints.js', 'report-plan.js']) vm.runInContext(await readFile(new URL('../' + name, import.meta.url), 'utf8'), context);
+for (const name of ['report-endpoints.js', 'report-plan.js']) vm.runInContext(await readFile(new URL('../extension/' + name, import.meta.url), 'utf8'), context);
 const { REPORT_ENDPOINTS: endpoints, REPORT_PLAN: plan } = context;
 const profile = { suburb: 'Surry Hills', mesh_block: '11201234567', lga: 'Sydney', sa4: 'Sydney - City',
   sa1: '112345', sa2: 'Surry Hills', sa3: 'City', postcode: '2010', gccsa: 'Greater Sydney', state: 'NSW' };
 const plain = value => JSON.parse(JSON.stringify(value));
 
 test('registry accounts for every checked-in API path and every address dataset', async () => {
-  const spec = await readFile(new URL('../assets/microburbs-hackathon-api.yaml', import.meta.url), 'utf8');
+  const spec = await readFile(new URL('../docs/api/microburbs-hackathon-api.yaml', import.meta.url), 'utf8');
   const paths = [...spec.matchAll(/^  (\/[^\n]+):\s*$/gm)].map(match => match[1]);
   assert.deepEqual(Array.from(endpoints, e => e.path).sort(), paths.sort());
   const tasks = [...plan.start({ id: 'GANSW1' }), ...plan.geographic(profile)];

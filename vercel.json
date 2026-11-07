@@ -7,13 +7,17 @@
   "functions": {
     "api/compute.py": {
       "maxDuration": 10,
-      "excludeFiles": "{node_modules/**,tests/**,assets/**,dist/**,src/**,.build/**,.tools/**}"
+      "excludeFiles": "{node_modules/**,tests/**,extension/**,data/**,docs/**,reports/**,dist/**,.build/**,.tools/**}",
+      "includeFiles": ".private/rental/*.json"
     },
     "api/chat.ts": {
       "maxDuration": 60
     },
     "api/health.ts": {
       "maxDuration": 10
+    },
+    "api/rental.ts": {
+      "maxDuration": 30
     }
   }
 }

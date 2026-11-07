@@ -1,7 +1,7 @@
 import { it, expect, vi, afterEach } from 'vitest';
 import { act, within, fireEvent } from '@testing-library/react';
-import { attachPropertyLookup } from '../../src/property-lookup';
-import { mountSaveAction, mountWidget } from '../../src/injected';
+import { attachPropertyLookup } from '../../extension/src/property-lookup';
+import { mountSaveAction, mountWidget } from '../../extension/src/injected';
 const candidate = { id: 'GANSW1', label: '26 Tudor Street, Surry Hills' };
 const reply = () => ({ ok: true, sections: { basics: { status: 'ok', data: { dwelling_type: 'house', bed_count: 0, bath_count: null, parking_count: 1, land_area_sqm: 120 } }, valuation: { status: 'ok', data: { predicted_price: 1200000, predicted_price_low: 1000000, predicted_price_high: 1400000, prediction_date: '2026-04-20', confidence_score: 70 } }, risks: { status: 'ok', data: { bushfire: [{ on_property: true, nearest_distance_m: 0 }], flood: [{ on_property: false, nearest_distance_m: 257 }], hv_power_line: [{ on_property: false, nearest_distance_m: 100 }], public_housing: [{ on_property: true, value: '3.4%', value_unit: 'Properties Proportion', nearest_distance_m: 0 }] } } } });
 let disposals: (() => void)[] = [];

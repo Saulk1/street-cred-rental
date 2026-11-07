@@ -1,4 +1,5 @@
 # Upload only the API, its dependencies and build configuration.
+# Extension source, datasets, documentation, reports and tests stay local.
 *
 !api
 !api/**
@@ -21,3 +22,8 @@
 **/*.csv
 **/*.tsv
 **/__pycache__/**
+
+# Explicitly staged private deployment artifacts, never extension inputs.
+!.private
+!.private/rental
+!.private/rental/*.json

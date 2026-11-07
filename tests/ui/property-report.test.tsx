@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PropertyReport, type ReportSnapshot } from '../../src/property-report';
+import { PropertyReport, type ReportSnapshot } from '../../extension/src/property-report';
 
 let report: ReportSnapshot | null;
 let send: ReturnType<typeof vi.fn>;

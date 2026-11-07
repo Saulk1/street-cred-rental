@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { calculateWellbeing } from '../../src/lib/wellbeing';
+import { calculateWellbeing } from '../../extension/src/lib/wellbeing';
 
 const data = (values: unknown[]) => ({ area_name: 'Surry Hills (NSW)', area_level: 'suburb', scores: ['lifestyle', 'convenience', 'family', 'safety', 'tranquility'].map((key, index) => ({ key, value: values[index] })) });
 it('equally weights the five specified dimensions and ignores unrelated scores', () => {

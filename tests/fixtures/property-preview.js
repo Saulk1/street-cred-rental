@@ -3,7 +3,7 @@
 // Main-world UI preview only. The real extension uses its isolated-world worker.
 // Invented observations with field shapes from the bundled hackathon YAML.
 const sectionFixtures = fetch('property-sections.json').then(response => response.json());
-chrome.runtime = { getURL: path => new URL('../../' + path, location.href).href, async sendMessage(message) {
+chrome.runtime = { getURL: path => new URL('../../extension/' + path, location.href).href, async sendMessage(message) {
   const scenario = document.getElementById("scenario").value;
   if (message.type === "SEARCH_ADDRESS") return { ok: true, candidates: scenario === "empty" ? [] : [
     { id: "GANSW705970502", label: "26 Tudor Street, Surry Hills (mock)" },

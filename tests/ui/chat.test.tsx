@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { PropertyChat } from '../../src/chat';
+import { PropertyChat } from '../../extension/src/chat';
 import { CHAT_KEY } from '../../shared/chat';
-import { contextFor } from '../../src/lib/chat';
+import { contextFor } from '../../extension/src/lib/chat';
 import { calculation } from '../fixtures/calculation';
 
 let stored: Record<string, any>;
@@ -39,7 +39,7 @@ it('sends, streams plain text safely, saves and restores one thread without read
   expect(document.querySelector('img[src="x"]')).toBeNull();
   expect(screen.getByAltText('Microburbs')).toBeVisible();
   expect(api.storage.local.get).toHaveBeenCalledWith(CHAT_KEY);
-  expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toEqual({ messages: [{ role: 'user', content: '26 Tudor Street' }] });
+  expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toMatchObject({ messages: [{ role: 'user', content: '26 Tudor Street' }] });
   expect(fetcher.mock.calls[0][1]).toMatchObject({ credentials: 'omit', redirect: 'error', headers: { Authorization: 'Bearer dummy-team-token' } });
   view.unmount(); await mount();
   expect(screen.getByText('26 Tudor Street')).toBeVisible();
@@ -144,4 +144,77 @@ it('shows calculation metrics, inputs and limitations and preserves them across 
   trigger.focus(); await user.keyboard('{Enter}');
   expect(trigger).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByText('30 AUD/week')).toBeVisible();
+});
+
+it('streams rental questions, submits an option, restores the session and ends it on New chat', async () => {
+  const { rentalQuestion, rentalRecommendation } = await import('../fixtures/rental');
+  const fetcher = vi.spyOn(globalThis,'fetch').mockImplementation(async (url, init) => {
+    if (String(url).endsWith('/api/chat')) return reply({type:'rental_result',rental:rentalQuestion},{type:'delta',text:'I have one rental question.'},{type:'done'});
+    const command=JSON.parse(init!.body as string).command;
+    return Response.json(command.operation==='end' ? {ended:true} : rentalRecommendation);
+  });
+  const user=userEvent.setup(); const view=await mount();
+  await user.type(screen.getByRole('textbox',{name:'Message'}),'Find a rental under $800{Enter}');
+  await screen.findByText('Do you need a pet-friendly home?');
+  expect(within(screen.getByRole('region', { name:'Conversation messages' })).getByText('Do you need a pet-friendly home?')).toBeVisible();
+  await user.click(screen.getByRole('radio',{name:'Yes, I have pets'}));
+  await user.click(screen.getByRole('button',{name:'Apply answer'}));
+  await screen.findByText('1 Example Street');
+  expect(screen.queryByRole('button', {name:'Apply answer'})).toBeNull();
+  const submitted=fetcher.mock.calls.find(([url])=>String(url).endsWith('/api/rental'))!;
+  expect(JSON.parse(submitted[1]!.body as string)).toMatchObject({context:{revision:1},command:{operation:'answer',questionId:'q-001',optionId:'yes'}});
+  expect(screen.getByText(/Price needs verification/)).toBeVisible();
+  await waitFor(()=>expect(stored['property-rental:v1'].context.revision).toBe(2));
+  view.unmount(); await mount();
+  await screen.findByText('1 Example Street');
+  await waitFor(()=>expect(fetcher.mock.calls.some(([,init])=>JSON.parse(init!.body as string).command?.operation==='resume')).toBe(true));
+  await user.click(screen.getByRole('button',{name:'New chat'}));
+  await waitFor(()=>expect(stored['property-rental:v1']).toBeUndefined());
+  expect(fetcher.mock.calls.some(([,init])=>JSON.parse(init!.body as string).command?.operation==='end')).toBe(true);
+});
+
+it.each(['custom', 'skip'] as const)('advances to a new question after a %s answer and removes obsolete controls', async mode => {
+  const { rentalQuestion } = await import('../fixtures/rental');
+  const nextQuestion = { revision:2, result:{ ...rentalQuestion.result, question_id:'q-002',
+    question_key:'needs.furnished', question_text:'Do you need furniture?',
+    options:[{id:'yes',label:'Furnished please'}, {id:'skip',label:'Skip for now'}] } };
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async url => String(url).endsWith('/api/chat')
+    ? reply({type:'rental_result', rental:rentalQuestion}, {type:'delta',text:'Choose an option below.'}, {type:'done'})
+    : Response.json(nextQuestion));
+  const user = userEvent.setup(); await mount();
+  await user.type(screen.getByRole('textbox', {name:'Message'}), 'Find rentals{Enter}');
+  await screen.findByText(rentalQuestion.result.question_text!);
+  if (mode === 'custom') await user.type(screen.getByRole('textbox', {name:'Or give a custom answer'}), 'I have a cat');
+  else await user.click(screen.getByRole('radio', {name:'Skip for now'}));
+  await user.click(screen.getByRole('button', {name:'Apply answer'}));
+  await screen.findByText('Do you need furniture?');
+  const request = JSON.parse(fetcher.mock.calls[1][1]!.body as string);
+  expect(request).toMatchObject({context:{revision:1}, command:{operation:'answer',questionId:'q-001',
+    ...(mode === 'custom' ? {text:'I have a cat'} : {optionId:'skip'})}});
+  expect(screen.queryByRole('radio', {name:'Yes, I have pets'})).toBeNull();
+  expect(screen.getAllByRole('button', {name:'Apply answer'})).toHaveLength(1);
+  expect(screen.getByRole('textbox', {name:'Or give a custom answer'})).toHaveValue('');
+});
+
+it('restores a pending question in place and accepts an answer after reopening', async () => {
+  const { rentalQuestion, rentalRecommendation } = await import('../fixtures/rental');
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    if (String(url).endsWith('/api/chat')) return reply({type:'rental_result',rental:rentalQuestion}, {type:'done'});
+    const command = JSON.parse(init!.body as string).command;
+    return Response.json(command.operation === 'resume' ? {...rentalQuestion,revision:2} : {...rentalRecommendation,revision:3});
+  });
+  const user = userEvent.setup(); const view = await mount();
+  await user.type(screen.getByRole('textbox', {name:'Message'}), 'Find rentals{Enter}');
+  await screen.findByText(rentalQuestion.result.question_text!);
+  await waitFor(() => expect(stored[CHAT_KEY].at(-1).state).toBe('complete'));
+  const originalMessageId = stored[CHAT_KEY].at(-1).id;
+  view.unmount(); await mount();
+  await waitFor(() => expect(stored['property-rental:v1'].context.revision).toBe(2));
+  expect(stored[CHAT_KEY]).toHaveLength(2);
+  expect(stored[CHAT_KEY].at(-1).id).toBe(originalMessageId);
+  expect(screen.getAllByText(rentalQuestion.result.question_text!)).toHaveLength(1);
+  await user.click(screen.getByRole('radio', {name:'Yes, I have pets'}));
+  await user.click(screen.getByRole('button', {name:'Apply answer'}));
+  await screen.findByText('1 Example Street');
+  expect(JSON.parse(fetcher.mock.calls.at(-1)![1]!.body as string)).toMatchObject({context:{revision:2},command:{questionId:'q-001'}});
 });

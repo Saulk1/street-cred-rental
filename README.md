@@ -121,6 +121,7 @@ members building this hackathon entry together:
 - Sibo (William) Zhang
 - Nathan Li
 - Himesha Patel
+- Saulk1 (rental advisor world model and preference learning)
 
 The extension is a beta prototype; its current functionality is described below.
 

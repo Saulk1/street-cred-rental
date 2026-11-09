@@ -25,12 +25,12 @@ MISSING_PENALTY = 1.0e6
 MAX_DISCOUNT_PCT = 40.0
 
 DEFAULT_VALUE_WEIGHTS: Dict[str, float] = {"value": 1.0, "groceries": 1.0, "station": 0.0, "commute": 1.0}
-# 通勤：每公里（估算步行）4 分；车站软偏好：每 100 米 1 × station 权重（默认 0，靠反馈学）
-COMMUTE_POINTS_PER_KM = 4.0
+# 通勤：每公里（估算步行）8 分；车站软偏好：每 100 米 1 × station 权重（默认 0，靠反馈学）
+COMMUTE_POINTS_PER_KM = 8.0
 COMMUTE_DETOUR = 1.30
 STATION_POINTS_PER_100M = 1.0
-# 用户需要某项（宠物 / 家具 / 车位）但房源描述没写：扣 6 分，并在理由里提示去确认
-UNKNOWN_NEED_PENALTY = 6.0
+# 用户需要某项（宠物 / 家具 / 车位）但房源描述没写：扣 18 分，使明确满足（True）的房源优先于未写明（None）房源
+UNKNOWN_NEED_PENALTY = 18.0
 EMPHASIS_MULTIPLIERS: Dict[str, Dict[str, float]] = {
     "groceries": {"groceries": 3.0},
     "value": {"value": 2.0},

@@ -49,7 +49,8 @@ def export_advisor(advisor):
             'asked_keys': advisor.asked_keys, 'pending': dataclasses.asdict(advisor.pending['plan']) if advisor.pending else None,
             'pending_meta': {k: v for k, v in advisor.pending.items() if k not in ('spec', 'plan')} if advisor.pending else None,
             'last_shown': list(advisor.last_shown), 'question_seq': advisor._question_seq,
-            'invalidated_counts': advisor._invalidated_counts, 'forced_question_key': advisor._forced_question_key, 'rejected_ids': getattr(advisor, '_rejected_ids', []), 'language': getattr(advisor, '_language', 'en')}
+            'invalidated_counts': advisor._invalidated_counts, 'forced_question_key': advisor._forced_question_key, 'rejected_ids': getattr(advisor, '_rejected_ids', []),
+            'skip_counts': advisor.skip_counts, 'dropped_ids': sorted(advisor.rejected_listing_ids), 'language': getattr(advisor, '_language', 'en')}
     return json.loads(json.dumps(saved, allow_nan=False))
 
 
@@ -64,6 +65,8 @@ def restore_advisor(saved, listings, ranker):
     advisor.state = UserState(**state)
     advisor._language = saved.get('language', 'en')
     advisor._rejected_ids = list(saved.get('rejected_ids', []))
+    advisor.skip_counts = {str(k): int(v) for k, v in dict(saved.get('skip_counts', {})).items()}
+    advisor.rejected_listing_ids = {str(i) for i in saved.get('dropped_ids', [])}
     advisor.listings = tuple(l for l in advisor.listings if l.listing_id not in advisor._rejected_ids)
     advisor.version = saved['version']
     advisor.asked_keys = list(saved['asked_keys'])

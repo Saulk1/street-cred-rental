@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from .answer import parse_custom_distance
 from .microburbs import build_candidate_pool  # noqa: F401  (re-export for callers)
-from .needs import COMMUTE_NONE, _w, apply_state_patch, extract_needs
+from .needs import COMMUTE_NONE, DESTINATIONS, NEED_KEYS, _w, apply_state_patch, commute_of, extract_needs, needs_of
 from .questions import (
     DEFAULT_ASK_THRESHOLD,
     DEFAULT_MAX_QUESTIONS,
@@ -32,10 +32,13 @@ from .questions import (
     question_value,
 )
 from .transition import filter_feasible
-from .types import STATION_CONFIRMED, STATION_DEFERRED, Listing, UserState
+from .types import STATION_CONFIRMED, STATION_DEFERRED, STATION_UNKNOWN, Listing, UserState
 
 DEFAULT_POOL_SIZE = 60
 DEFAULT_MAX_INVALID_ATTEMPTS = 3
+# 用户没选首选、而首选在更新偏好后仍排第一：累计到这么多次才把它移出候选池。
+# 1 = 第一次就移除（一次随手的选择就可能删掉真正最合适的房源）；0 = 永不移除。
+DEFAULT_SKIP_PATIENCE = 3
 _TEXT_SKIP_WORDS = ("跳过", "暂时跳过", "不想说", "不想回答", "不回答", "先不问", "再说")
 _COMMUTE_NONE_WORDS = ("不固定", "无所谓", "没要求", "都可以", "都行", "随便")
 
@@ -43,10 +46,16 @@ _COMMUTE_NONE_WORDS = ("不固定", "无所谓", "没要求", "都可以", "都�
 class RentalAdvisor:
     def __init__(self, listings: Sequence[Listing], ranker: Any, *, suburbs: Sequence[str] = (),
                  initial_state: Optional[UserState] = None, pool_size: int = DEFAULT_POOL_SIZE,
-                 max_questions: int = DEFAULT_MAX_QUESTIONS, ask_threshold: float = DEFAULT_ASK_THRESHOLD,
+                 max_questions: Optional[int] = None, ask_threshold: float = DEFAULT_ASK_THRESHOLD,
                  max_invalid_attempts: int = DEFAULT_MAX_INVALID_ATTEMPTS,
                  priors: Optional[Mapping[str, Mapping[str, float]]] = None,
-                 llm: Optional[Callable[[str], Any]] = None) -> None:
+                 llm: Optional[Callable[[str], Any]] = None,
+                 learner: Optional[str] = None, selector: Optional[str] = None,
+                 skip_patience: int = DEFAULT_SKIP_PATIENCE) -> None:
+        self.skip_patience = skip_patience
+        self.skip_counts: Dict[str, int] = {}
+        self.learner = learner      # None = questions.DEFAULT_LEARNER
+        self.selector = selector    # None = questions.DEFAULT_SELECTOR
         self.listings = tuple(listing for listing in listings
                               if listing.station_walk_m is not None and not listing.extra.get("price_flag"))
         self.by_id = {listing.listing_id: listing for listing in self.listings}
@@ -55,7 +64,8 @@ class RentalAdvisor:
         self.state = initial_state or UserState()
         self.version = 1
         self.pool_size = pool_size
-        self.max_questions = max_questions
+        self._explicit_max_questions = max_questions is not None
+        self.max_questions = DEFAULT_MAX_QUESTIONS if max_questions is None else max_questions
         self.ask_threshold = ask_threshold
         self.max_invalid_attempts = max_invalid_attempts
         self.priors = priors
@@ -65,6 +75,7 @@ class RentalAdvisor:
         self.last_shown: Tuple[Dict[str, Any], ...] = ()
         self.events: Dict[str, Dict[str, Any]] = {}
         self.log: List[Dict[str, Any]] = []
+        self.rejected_listing_ids: set = set()
         self._question_seq = 0
         self._invalidated_counts: Dict[str, int] = {}
         self._forced_question_key: Optional[str] = None
@@ -87,19 +98,52 @@ class RentalAdvisor:
             self.asked_keys.append(key)
         self.pending = None
 
+    def _reserve_diverse_strict_ids(self, strict: Sequence[Listing], ranked_strict: Sequence[str]) -> List[str]:
+        """在未确认宠物/家具/车位/通勤/车站前，从可行池中保底保留各维度最优代表，防止稀疏特征被纯低价截断淘汰。"""
+        if len(ranked_strict) <= self.pool_size or self.pool_size < 6:
+            return list(ranked_strict[: self.pool_size])
+        reserved: List[str] = []
+        known_needs = needs_of(self.state)
+        for need in NEED_KEYS:
+            if need not in known_needs and f"needs.{need}" not in self.asked_keys:
+                matches = [lid for lid in ranked_strict
+                           if (self.by_id[lid].extra.get("features") or {}).get(need) is True]
+                reserved.extend(matches[:2])
+        if commute_of(self.state) is None and "commute_to" not in self.asked_keys:
+            for dest in DESTINATIONS:
+                dest_state = apply_state_patch(self.state, {"commute_to": dest})
+                dest_ranked = [str(i) for i in self.ranker.rank(dest_state, strict, self.ranker.snapshot_id)]
+                reserved.extend(dest_ranked[:1])
+        if self.state.station_walk.status == STATION_UNKNOWN and "station_walk_max_m" not in self.asked_keys:
+            for limit in (400.0, 800.0):
+                near = [lid for lid in ranked_strict
+                        if self.by_id[lid].station_walk_m is not None and self.by_id[lid].station_walk_m <= limit]
+                reserved.extend(near[:1])
+        unique_reserved = list(dict.fromkeys(reserved))[: max(1, self.pool_size // 3)]
+        head_count = max(1, self.pool_size - len(unique_reserved))
+        combined = list(dict.fromkeys(list(ranked_strict[:head_count]) + unique_reserved))
+        for lid in ranked_strict:
+            if len(combined) >= self.pool_size:
+                break
+            if lid not in combined:
+                combined.append(lid)
+        return combined[: self.pool_size]
+
     def candidates(self) -> Tuple[Listing, ...]:
-        """候选池：按硬要求过滤后取排序前 pool_size 套。
+        """候选池：按硬要求过滤后取排序前 pool_size 套（含未确认维度的代表房源）。
 
         已确认的车站上限必须在截断前生效，否则池子里可能只剩少数甚至没有达标房源；
         车站未问时本来就不设限。预算未问过时留 10% 余量，给"预算能否放宽"留出比较对象。
         """
-        strict = filter_feasible(self.state, self.listings)
-        strict_ids = [str(i) for i in self.ranker.rank(self.state, strict, self.ranker.snapshot_id)][: self.pool_size]
+        available = tuple(item for item in self.listings if item.listing_id not in self.rejected_listing_ids)
+        strict = filter_feasible(self.state, available)
+        ranked_strict = [str(i) for i in self.ranker.rank(self.state, strict, self.ranker.snapshot_id)]
+        strict_ids = self._reserve_diverse_strict_ids(strict, ranked_strict)
         extra_ids: List[str] = []
         if self.state.budget_weekly_max is not None and self.state.other_confirmed.get("budget_stretch_pct") is None:
             open_state = apply_state_patch(self.state, {"budget_stretch_pct": BUDGET_STRETCH_PCT})
             strict_set = {listing.listing_id for listing in strict}
-            stretch_only = [listing for listing in filter_feasible(open_state, self.listings)
+            stretch_only = [listing for listing in filter_feasible(open_state, available)
                             if listing.listing_id not in strict_set]
             extra_ids = [str(i) for i in self.ranker.rank(self.state, stretch_only,
                                                           self.ranker.snapshot_id)][: self.pool_size]
@@ -148,7 +192,7 @@ class RentalAdvisor:
 
         plan = plan_multi(self.state, pool, self.ranker, self.ranker.snapshot_id,
                           asked_keys=self.asked_keys, max_questions=self.max_questions,
-                          ask_threshold=self.ask_threshold, priors=self.priors)
+                          ask_threshold=self.ask_threshold, priors=self.priors, selector=self.selector)
         if plan.action == "ask" and plan.question is not None:
             self._question_seq += 1
             question_id = f"q-{self._question_seq:03d}"
@@ -286,11 +330,55 @@ class RentalAdvisor:
 
     def feedback(self, *, chosen_id: Optional[str] = None, rejected_ids: Sequence[str] = (),
                  reasons: Sequence[str] = ()) -> Dict[str, Any]:
+        best_shown = next((item for item in self.last_shown if item.get("role") == "best"),
+                          self.last_shown[0] if self.last_shown else None)
+        best_id = best_shown.get("listing_id") if best_shown else None
         patch, notes = apply_feedback(self.state, self.last_shown, self.by_id, self.ranker,
-                                      chosen_id=chosen_id, rejected_ids=rejected_ids, reasons=reasons)
+                                      chosen_id=chosen_id, rejected_ids=rejected_ids, reasons=reasons,
+                                      learner=self.learner)
+        if reasons:
+            extracted = extract_needs("，".join(reasons), suburbs=self.suburbs, llm=self.llm).patch
+            for k, v in extracted.items():
+                if k == "excluded_districts":
+                    patch[k] = list(dict.fromkeys(list(patch.get(k, ())) + list(v)))
+                elif k not in patch:
+                    patch[k] = v
+
+        if rejected_ids:
+            self.rejected_listing_ids.update(str(i) for i in rejected_ids if i and i != chosen_id)
+
         if any("还不知道目的地" in note for note in notes):
             self._forced_question_key = "commute_to"
             if self.pending is not None:
                 self._invalidate_pending()
+        elif chosen_id and best_id and chosen_id != best_id and chosen_id in self.by_id and best_id in self.by_id:
+            # 若用户选中的备选房源具备某项未确认特征（如明确带家具/可养宠/有车位）而原首选没有，主动追问该需求
+            known_needs = needs_of(self.state)
+            chosen_feat = self.by_id[chosen_id].extra.get("features") or {}
+            best_feat = self.by_id[best_id].extra.get("features") or {}
+            for need in NEED_KEYS:
+                qkey = f"needs.{need}"
+                if (need not in known_needs and qkey not in self.asked_keys
+                        and chosen_feat.get(need) is True and best_feat.get(need) is not True):
+                    self._forced_question_key = qkey
+                    break
+
+        if not self._explicit_max_questions and len(self.asked_keys) >= self.max_questions:
+            # 用户对当前推荐给出反馈时，若仍有高价值未问问题，允许追加 1 问以打破“只推不问”的卡片二选一循环
+            self.max_questions = len(self.asked_keys) + 1
+
         self._apply(patch, "feedback")
-        return {"patch": patch, "notes": notes, "next": self.next()}
+        next_step = self.next()
+        if (chosen_id and best_id and chosen_id != best_id
+                and best_id not in self.rejected_listing_ids
+                and next_step.get("action") == "recommend"
+                and next_step.get("recommendations")
+                and next_step["recommendations"][0]["listing_id"] == best_id):
+            # 权重已达上限或分差过大导致原首选仍霸榜：被跳过达到 skip_patience 次后移出候选池并重算，
+            # 防止无限循环推荐同一套；次数不够时保留，避免一次带噪声的选择删掉真正合适的房源。
+            self.skip_counts[str(best_id)] = self.skip_counts.get(str(best_id), 0) + 1
+            if self.skip_patience and self.skip_counts[str(best_id)] >= self.skip_patience:
+                self.rejected_listing_ids.add(str(best_id))
+                next_step = self.next()
+
+        return {"patch": patch, "notes": notes, "next": next_step}

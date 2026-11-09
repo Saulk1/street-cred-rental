@@ -66,6 +66,48 @@ class ComputeTests(unittest.TestCase):
             q=result['question_id']; opt=result['options'][0]['id']
             self.assertEqual(advisor.answer(q,option_id=opt),restored.answer(q,option_id=opt))
 
+    def test_feedback_learning_survives_the_compute_boundary(self):
+        # Each request rebuilds the advisor from saved state: evidence, skip counts and dropped homes must persist.
+        def home(listing_id, rent, market):
+            return Listing(listing_id=listing_id, station_walk_m=300, weekly_rent=rent, bedrooms=1, supermarket_walk_min=market,
+                           extra={'fair_rent':700, 'features':{'pets':True, 'furnished':True, 'parking':True}})
+        manifest = {'version':'a'*64, 'modelVersion':'fixture', 'collectedAt':'2026-11-07T00:00:00Z'}
+        learnable = [home('A', 600, 2), home('B', 560, 9), home('C', 640, 1)]
+        with patch('compute.rental.load_artifacts', return_value=(manifest, learnable, ValueRanker('fixture'))):
+            step = run(payload())
+            self.assertEqual(step['result']['recommendations'][0]['listing_id'], 'A')
+            for _ in range(2):
+                step = run(payload({'operation':'feedback', 'chosenId':'B'}, step['state'], step['artifactVersion']))
+            self.assertEqual(step['result']['recommendations'][0]['listing_id'], 'B')
+            self.assertEqual(len(step['state']['state']['soft_preferences']['preference_evidence']), 2)
+            self.assertGreater(step['state']['state']['soft_preferences']['weight_adjust']['value'], 1.0)
+            self.assertEqual(step['state']['dropped_ids'], [])
+        dominated = [home('A', 520, 2), home('B', 600, 2), home('C', 620, 2)]   # A is never worse: learning cannot prefer B
+        with patch('compute.rental.load_artifacts', return_value=(manifest, dominated, ValueRanker('fixture'))):
+            step = run(payload())
+            tops = []
+            for _ in range(3):
+                step = run(payload({'operation':'feedback', 'chosenId':'B'}, step['state'], step['artifactVersion']))
+                tops.append(step['result']['recommendations'][0]['listing_id'])
+            self.assertEqual(tops, ['A', 'A', 'B'])
+            self.assertEqual(step['state']['dropped_ids'], ['A'])
+            again = run(payload({'operation':'resume'}, step['state'], step['artifactVersion']))
+            self.assertNotIn('A', [item['listing_id'] for item in again['result']['recommendations']])
+
+    def test_state_saved_before_preference_learning_still_loads(self):
+        listings = [Listing(listing_id='A', station_walk_m=300, weekly_rent=600, bedrooms=1, supermarket_walk_min=2, extra={'fair_rent':700}),
+                    Listing(listing_id='B', station_walk_m=300, weekly_rent=560, bedrooms=1, supermarket_walk_min=9, extra={'fair_rent':700})]
+        ranker = ValueRanker('test')
+        advisor = RentalAdvisor(listings, ranker)
+        advisor.next()
+        saved = json.loads(json.dumps(export_advisor(advisor)))
+        for key in ('skip_counts', 'dropped_ids'):
+            del saved[key]
+        saved['state']['soft_preferences']['weight_adjust'] = {'value': 1.5}       # written by the old heuristic
+        restored = restore_advisor(saved, listings, ranker)
+        self.assertEqual((restored.skip_counts, restored.rejected_listing_ids), ({}, set()))
+        self.assertEqual(restored.next()['action'], 'recommend')
+
     def test_private_artifacts_recommendations_and_followup(self):
         try: load_artifacts()
         except ComputeError: self.skipTest('Private artifacts not staged')

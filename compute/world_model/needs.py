@@ -70,11 +70,12 @@ def weight_adjust_of(state: UserState) -> Dict[str, float]:
 # 通用补丁
 # ---------------------------------------------------------------------------
 PATCH_KEYS = ("station_walk", "needs", "excluded_districts", "commute_to", "budget_stretch_pct",
-              "weight_adjust", "budget_weekly_max", "bedrooms", "districts")
+              "weight_adjust", "preference_evidence", "budget_weekly_max", "bedrooms", "districts")
+MAX_PREFERENCE_EVIDENCE = 30
 
 
-# 模型只能写用户说出来的条件；weight_adjust 只由选择 / 拒绝反馈产生
-LLM_PATCH_KEYS = tuple(key for key in PATCH_KEYS if key != "weight_adjust")
+# 模型只能写用户说出来的条件；weight_adjust / preference_evidence 只由选择 / 拒绝反馈产生
+LLM_PATCH_KEYS = tuple(key for key in PATCH_KEYS if key not in ("weight_adjust", "preference_evidence"))
 
 
 def _is_number(value: Any) -> bool:
@@ -115,6 +116,11 @@ def validate_patch(patch: Mapping[str, Any]) -> Dict[str, Any]:
                        for k, v in value.items() if k in WEIGHT_KEYS and _is_number(v)}
             if weights:
                 clean[key] = weights
+        elif key == "preference_evidence":
+            from .preference import clean_evidence  # 避免循环导入
+            entries = clean_evidence(value)
+            if entries:
+                clean[key] = entries
     return clean
 
 
@@ -139,6 +145,9 @@ def apply_state_patch(state: UserState, patch: Mapping[str, Any]) -> UserState:
         soft["commute_to"] = clean["commute_to"]
     if "weight_adjust" in clean:
         soft["weight_adjust"] = {**dict(soft.get("weight_adjust") or {}), **clean["weight_adjust"]}
+    if "preference_evidence" in clean:   # 追加；只保留最近若干条
+        merged_evidence = list(soft.get("preference_evidence") or []) + clean["preference_evidence"]
+        soft["preference_evidence"] = merged_evidence[-MAX_PREFERENCE_EVIDENCE:]
     if "budget_weekly_max" in clean:
         budget = clean["budget_weekly_max"]
     if "bedrooms" in clean:

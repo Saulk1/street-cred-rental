@@ -26,6 +26,7 @@ from .needs import (
     needs_of,
     weight_adjust_of,
 )
+from .preference import eus_select, evidence_of, posterior_adjust, unit_features
 from .scenarios import build_adaptive_question
 from .transition import DISTANCE_VIEW_HIGH, DISTANCE_VIEW_LOW, distance_view, filter_feasible
 from .types import STATION_DEFERRED, STATION_UNKNOWN, Listing, UserState
@@ -122,6 +123,19 @@ def _yes_no(key: str, text: str, need: str, priors: Mapping[str, float], yes_lab
     )
 
 
+def _station_branch_prior(max_m: Optional[float]) -> float:
+    """按距离阈值赋予合理的默认先验：越苛刻的步行上限（如 ≤400m）在真实租客中占比越低。"""
+    if max_m is None:
+        return 0.35
+    if max_m <= 500.0:
+        return 0.12
+    if max_m <= 800.0:
+        return 0.23
+    if max_m <= 1200.0:
+        return 0.30
+    return 0.35
+
+
 def build_question_bank(state: UserState, candidates: Sequence[Listing], ranker: Any, snapshot_id: str,
                         *, priors: Optional[Mapping[str, Mapping[str, float]]] = None,
                         exclude: Sequence[str] = ()) -> List[QuestionSpec]:
@@ -134,8 +148,11 @@ def build_question_bank(state: UserState, candidates: Sequence[Listing], ranker:
         adaptive = build_adaptive_question(state, candidates, ranker, snapshot_id)
         if adaptive is not None:
             station_priors = table.get("station_walk_max_m") or {}
-            branches = tuple(Branch(s.scenario_id, s.label, s.next_state_patch(),
-                                    station_priors.get(s.scenario_id, 1.0)) for s in adaptive.scenarios)
+            branches = tuple(
+                Branch(s.scenario_id, s.label, s.next_state_patch(),
+                       station_priors.get(s.scenario_id, _station_branch_prior(s.max_m)))
+                for s in adaptive.scenarios
+            )
             options = []
             for option in adaptive.options:
                 if option.effect == "skip":
@@ -197,6 +214,7 @@ def _top(state: UserState, candidates: Sequence[Listing], ranker: Any, snapshot_
 def question_value(spec: QuestionSpec, state: UserState, candidates: Sequence[Listing], ranker: Any,
                    snapshot_id: str, default_id: str) -> QuestionValue:
     by_id = {listing.listing_id: listing for listing in candidates}
+    need_key = spec.key.split(".", 1)[1] if spec.key.startswith("needs.") else None
     rows: List[Dict[str, Any]] = []
     total, weight = 0.0, 0.0
     for branch in spec.branches:
@@ -206,7 +224,15 @@ def question_value(spec: QuestionSpec, state: UserState, candidates: Sequence[Li
         if default_id not in feasible_ids:
             regret = INFEASIBLE_COST
         else:
-            regret = max(0.0, ranker.score(branch_state, by_id[default_id]) - ranker.score(branch_state, by_id[top_id]))
+            score_gap = max(0.0, ranker.score(branch_state, by_id[default_id]) - ranker.score(branch_state, by_id[top_id]))
+            if (need_key and branch.branch_id == "yes" and top_id is not None and top_id != default_id
+                    and (by_id[default_id].extra.get("features") or {}).get(need_key) is None
+                    and (by_id[top_id].extra.get("features") or {}).get(need_key) is True):
+                # 澳洲房源大量未写明宠物/家具（None）：若默认房源未写明，而池中有明确满足（True）且在该分支胜出的房源，
+                # 计入待确认落空风险（0.5 × INFEASIBLE_COST）叠加实际分差，使真正有优质确认替代房源的问题优先浮出。
+                regret = min(INFEASIBLE_COST, score_gap + 0.5 * INFEASIBLE_COST)
+            else:
+                regret = score_gap
         rows.append({"branch": branch.branch_id, "prior": branch.prior, "top": top_id,
                      "feasible": len(feasible), "regret": round(regret, 2)})
         total += branch.prior * regret
@@ -257,8 +283,42 @@ def _price_needs_check(parts: Mapping[str, Any]) -> bool:
     return parts.get("gap_pct") < -MAX_DISCOUNT_PCT
 
 
+SELECTOR_ROLES = "roles"     # 固定角色：最优 / 更省钱 / 离车站更近 / 通勤更近
+SELECTOR_EUS = "eus"         # 按偏好后验贪心最大化 EUS（见 preference.py）
+LEARNER_HEURISTIC = "heuristic"
+LEARNER_BAYES = "bayes"
+# 默认值由 scripts/eval-preference-learning.py 的对比决定（README 有结果表）
+DEFAULT_SELECTOR = SELECTOR_EUS
+DEFAULT_LEARNER = LEARNER_BAYES
+
+
+def _eus_roles(state: UserState, picks: Sequence[str], by_id: Mapping[str, Listing]) -> List[Tuple[str, str, str]]:
+    """EUS 选出的备选按"相对首选最突出的优势"命名，沿用原有角色名，前端文案不用改。"""
+    best = by_id[picks[0]]
+    chosen: List[Tuple[str, str, str]] = [("best", "综合最优", picks[0])]
+    used = {"best"}
+    for listing_id in picks[1:]:
+        item = by_id[listing_id]
+        gains: List[Tuple[float, str, str]] = []
+        if best.weekly_rent and item.weekly_rent is not None:
+            gains.append(((best.weekly_rent - item.weekly_rent) / best.weekly_rent * 100.0, "cheapest", "更省钱"))
+        if best.station_walk_m is not None and item.station_walk_m is not None:
+            gains.append(((best.station_walk_m - item.station_walk_m) / 100.0, "closest_station", "离车站更近"))
+        near, far = commute_distance_km(state, item), commute_distance_km(state, best)
+        if near is not None and far is not None:
+            gains.append(((far - near) * 4.0, "closest_commute", "通勤更近"))
+        gains = [gain for gain in gains if gain[0] > 0.5 and gain[1] not in used]
+        if gains:
+            _gain, role, label = max(gains)
+            used.add(role)
+            chosen.append((role, label, listing_id))
+        else:
+            chosen.append(("alternative", "备选", listing_id))
+    return chosen
+
+
 def recommend_set(state: UserState, candidates: Sequence[Listing], ranker: Any, snapshot_id: str,
-                  k: int = 3, slack: float = 15.0) -> Tuple[Dict[str, Any], ...]:
+                  k: int = 3, slack: float = 15.0, selector: Optional[str] = None) -> Tuple[Dict[str, Any], ...]:
     """综合最优 + 若干"换一种取舍"的备选（分数不差于最优 slack 分以内），让用户的选择暴露偏好。"""
     feasible = filter_feasible(state, candidates)
     if not feasible:
@@ -283,6 +343,10 @@ def recommend_set(state: UserState, candidates: Sequence[Listing], ranker: Any, 
                       lambda ids: min(ids, key=lambda i: (_or_far(commute_distance_km(state, by_id[i])), scores[i], i))))
 
     chosen: List[Tuple[str, str, str]] = []
+    if (selector or DEFAULT_SELECTOR) == SELECTOR_EUS:
+        picks = eus_select(state, [by_id[listing_id] for listing_id in near], ranker, best_id, k)
+        chosen = _eus_roles(state, picks, by_id)
+        roles = []
     for role, label, pick in roles:
         if len(chosen) >= k:
             break
@@ -317,7 +381,7 @@ def plan_multi(state: UserState, candidates: Sequence[Listing], ranker: Any, sna
                asked_keys: Sequence[str] = (), max_questions: int = DEFAULT_MAX_QUESTIONS,
                ask_threshold: float = DEFAULT_ASK_THRESHOLD,
                priors: Optional[Mapping[str, Mapping[str, float]]] = None,
-               robust: bool = True, k: int = 3) -> MultiPlan:
+               robust: bool = True, k: int = 3, selector: Optional[str] = None) -> MultiPlan:
     default_id, _feasible = _top(state, candidates, ranker, snapshot_id)
     if default_id is None:
         # 严格预算下无房，但若预算尚未确认且放宽 10% 后有房源，应主动询问能否放宽预算，而非直接判无解。
@@ -369,7 +433,7 @@ def plan_multi(state: UserState, candidates: Sequence[Listing], ranker: Any, sna
 
     reason = ("question_budget_spent" if ranked and len(asked_keys) >= max_questions and ranked[0].value >= ask_threshold
               else "no_question_worth_asking")
-    recommendations = recommend_set(state, candidates, ranker, snapshot_id, k=k)
+    recommendations = recommend_set(state, candidates, ranker, snapshot_id, k=k, selector=selector)
     return MultiPlan(action="recommend", reason_code=reason, default_listing_id=default_id, values=tuple(ranked),
                      recommendations=recommendations, followup=followup_prompt(ranked), diagnostics=diagnostics)
 
@@ -392,14 +456,26 @@ _REASON_NOTES = {"value": "更看重价格", "station": "更看重离车站近",
 
 def apply_feedback(state: UserState, shown: Sequence[Mapping[str, Any]], listings: Mapping[str, Listing],
                    ranker: Any, *, chosen_id: Optional[str] = None, rejected_ids: Sequence[str] = (),
-                   reasons: Sequence[str] = ()) -> Tuple[Dict[str, Any], List[str]]:
-    """把"选了哪套 / 拒了哪套 / 为什么"转成档案补丁（权重倍数、排除区域）。只调软权重，不改硬要求。"""
+                   reasons: Sequence[str] = (), learner: Optional[str] = None) -> Tuple[Dict[str, Any], List[str]]:
+    """把"选了哪套 / 拒了哪套 / 为什么"转成档案补丁（权重倍数、排除区域）。只调软权重，不改硬要求。
+
+    learner="bayes"：把这次选择记成证据，权重取偏好后验均值（见 preference.py）；
+    learner="heuristic"：原来的固定倍数（×1.5 / ×2），保留作对照。
+    """
+    bayes = (learner or DEFAULT_LEARNER) == LEARNER_BAYES
     adjust = dict(weight_adjust_of(state))
     notes: List[str] = []
     patch: Dict[str, Any] = {}
     bumped_in_turn: set = set()
+    events: List[Dict[str, Any]] = []
 
     def bump(key: str, factor: float, why: str) -> None:
+        if bayes:
+            if key not in bumped_in_turn:
+                events.append({"r": key})
+                bumped_in_turn.add(key)
+            notes.append(why)
+            return
         if key not in bumped_in_turn:
             adjust[key] = adjust.get(key, 1.0) * factor
             bumped_in_turn.add(key)
@@ -419,11 +495,30 @@ def apply_feedback(state: UserState, shown: Sequence[Mapping[str, Any]], listing
                 bump(key, 2.0 if key == "station" else 1.5, _REASON_NOTES[key])
 
     best = next((item for item in shown if item.get("role") == "best"), shown[0] if shown else None)
+    if bayes:
+        shown_ids = [item["listing_id"] for item in shown if item.get("listing_id") in listings]
+        if chosen_id in shown_ids and len(shown_ids) >= 2:
+            features = {listing_id: list(unit_features(state, listings[listing_id], ranker)) for listing_id in shown_ids}
+            events.append({"c": features[chosen_id],
+                           "o": [features[listing_id] for listing_id in shown_ids if listing_id != chosen_id]})
+        if events:
+            before = weight_adjust_of(state)
+            after = posterior_adjust(evidence_of(state) + events)
+            patch["preference_evidence"] = events
+            patch["weight_adjust"] = after
+            if chosen_id and best and chosen_id != best["listing_id"]:
+                key, gain = max(((key, after[key] / before.get(key, after[key] if key == "station" else 1.0))
+                                 for key in after), key=lambda item: (item[1], item[0]))
+                if gain > 1.05 and key not in bumped_in_turn:
+                    notes.append(_REASON_NOTES[key])
+        return patch, notes
     if chosen_id and best and chosen_id != best["listing_id"] and chosen_id in listings and best["listing_id"] in listings:
         chosen, top = listings[chosen_id], listings[best["listing_id"]]
         a, b = ranker.score_breakdown(state, chosen), ranker.score_breakdown(state, top)
+        rent_saving = (((top.weekly_rent or 0.0) - (chosen.weekly_rent or 0.0)) / float(top.weekly_rent) * 100.0
+                       if top.weekly_rent else 0.0)
         advantages = {
-            "value": b["value"] - a["value"],
+            "value": max(b["value"] - a["value"], rent_saving),
             "groceries": b["groceries"] - a["groceries"],
             "station": ((top.station_walk_m or 0) - (chosen.station_walk_m or 0)) / 100.0,
             "commute": b["commute"] - a["commute"],

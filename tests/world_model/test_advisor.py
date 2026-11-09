@@ -6,7 +6,7 @@ import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(ROOT, "compute"))
+sys.path.insert(0, os.path.join(ROOT, "backend"))
 
 from world_model import Listing, StationWalkRequirement, UserState, matches_hard_requirements  # noqa: E402
 from world_model.advisor import RentalAdvisor  # noqa: E402
@@ -446,6 +446,8 @@ class FollowupTest(unittest.TestCase):
 
 
 class FeedbackTest(unittest.TestCase):
+    """固定倍数的启发式调权：不再是默认，保留作评估对照（learner="heuristic"）。"""
+
     def setUp(self):
         self.best = home("A", rent=650, market=1)
         self.cheap = home("B", rent=600, market=10, suburb="Redfern")
@@ -453,6 +455,7 @@ class FeedbackTest(unittest.TestCase):
         self.shown = ({"listing_id": "A", "role": "best"}, {"listing_id": "B", "role": "cheapest"})
 
     def feedback(self, st=None, **kwargs):
+        kwargs.setdefault("learner", "heuristic")
         return apply_feedback(st or state(), self.shown, self.listings, ranker(), **kwargs)
 
     def test_choosing_the_cheaper_one_raises_value_weight(self):
@@ -710,7 +713,7 @@ class AdvisorFlowTest(unittest.TestCase):
         cheap = home("B", rent=600, market=10, suburb="Redfern")
         shown = ({"listing_id": "A", "role": "best"}, {"listing_id": "B", "role": "cheapest"})
         patch, notes = apply_feedback(state(), shown, {"A": best, "B": cheap}, ranker(),
-                                      chosen_id="B", reasons=["太贵"])
+                                      chosen_id="B", reasons=["太贵"], learner="heuristic")
         self.assertEqual(patch["weight_adjust"]["value"], 1.5)
         self.assertEqual(len(notes), 2)
 
@@ -763,6 +766,186 @@ class AdvisorFlowTest(unittest.TestCase):
         res = advisor.feedback(reasons=["通勤太麻烦"])
         self.assertEqual(res["next"]["question_key"], "commute_to")
         self.assertEqual(advisor.pending["plan"].default_listing_id, "IN1")
+
+    def test_candidates_reserve_sparse_true_features_and_ask_unconfirmed_needs(self):
+        # 10 套未写明宠物/家具的低价房源 + 1 套明确允许宠物和带家具的房源
+        cheap_none = [home(f"N{i}", rent=550 + i * 2, fair=750, walk=300) for i in range(10)]
+        pet_furn = home("PF", rent=640, fair=750, walk=300, features={"pets": True, "furnished": True})
+        advisor = self.advisor(cheap_none + [pet_furn], pool_size=6)
+        cand_ids = [item.listing_id for item in advisor.candidates()]
+        self.assertIn("PF", cand_ids)
+        step = advisor.next()
+        self.assertEqual(step["action"], "ask")
+        self.assertIn(step["question_key"], ("needs.furnished", "needs.pets"))
+
+    def test_feedback_unlocks_remaining_questions_and_never_loops_on_rejected_cards(self):
+        # 三道高价值问题：车位、家具、宠物；默认首轮最多问 2 题后进入推荐，但用户反馈后会继续追问第 3 题
+        pool = [
+            home("A", rent=520, fair=800, walk=300, features={"parking": False, "furnished": False, "pets": False}),
+            home("B", rent=600, fair=780, walk=300, features={"parking": True, "furnished": True, "pets": True}),
+            home("C", rent=620, fair=780, walk=300, features={"parking": True, "furnished": True, "pets": True}),
+        ]
+        advisor = self.advisor(pool)
+        s1 = advisor.next()
+        self.assertEqual((s1["action"], s1["question_key"]), ("ask", "needs.parking"))
+        s2 = advisor.answer(s1["question_id"], option_id="no")["next"]
+        self.assertEqual((s2["action"], s2["question_key"]), ("ask", "needs.furnished"))
+        s3 = advisor.answer(s2["question_id"], option_id="no")["next"]
+        self.assertEqual(s3["action"], "recommend")
+        # 用户在前端对推荐结果给出反馈：应解锁第 3 个高价值问题 needs.pets，而不是卡在二选一推荐里
+        fb1 = advisor.feedback(chosen_id="B")
+        self.assertEqual((fb1["next"]["action"], fb1["next"]["question_key"]), ("ask", "needs.pets"))
+        s4 = advisor.answer(fb1["next"]["question_id"], option_id="no")["next"]
+        self.assertEqual(s4["action"], "recommend")
+        self.assertEqual(s4["recommendations"][0]["listing_id"], "A")
+        # 再次在前端点选 B（跳过榜首 A）。A 在每个可建模的维度上都不差于 B，偏好再怎么更新也排第一：
+        # 被跳过累计到 skip_patience 次后才移出，既不死循环重复推 A，也不因一次随手的选择就删掉它。
+        tops = []
+        for _ in range(advisor.skip_patience):
+            step = advisor.feedback(chosen_id="B")["next"]
+            self.assertEqual(step["action"], "recommend")
+            tops.append(step["recommendations"][0]["listing_id"])
+        self.assertEqual(tops[-1], "B")
+        self.assertTrue(all(top == "A" for top in tops[:-1]))
+        self.assertIn("A", advisor.rejected_listing_ids)
+
+    def test_skip_patience_one_restores_drop_on_first_skip(self):
+        pool = [home("A", rent=520, fair=800), home("B", rent=600, fair=780), home("C", rent=620, fair=780)]
+        st = state(other_confirmed={"needs": {"pets": False, "furnished": False, "parking": False},
+                                    "budget_stretch_pct": 0.0}, soft_preferences={"commute_to": "none"},
+                   station_walk=StationWalkRequirement(status="confirmed", max_m=None))
+        advisor = self.advisor(pool, initial_state=st, skip_patience=1)
+        self.assertEqual(advisor.next()["recommendations"][0]["listing_id"], "A")
+        self.assertEqual(advisor.feedback(chosen_id="B")["next"]["recommendations"][0]["listing_id"], "B")
+        never = self.advisor(pool, initial_state=st, skip_patience=0)
+        never.next()
+        for _ in range(5):
+            self.assertEqual(never.feedback(chosen_id="B")["next"]["recommendations"][0]["listing_id"], "A")
+        self.assertEqual(never.rejected_listing_ids, set())
+
+
+class PreferenceLearningTest(unittest.TestCase):
+    """默认学习器：选择记成证据，权重取偏好后验均值；推荐集合按 EUS 选。"""
+
+    def setUp(self):
+        self.listings = {"A": home("A", rent=650, market=1), "B": home("B", rent=600, market=10, suburb="Redfern")}
+        self.shown = ({"listing_id": "A", "role": "best"}, {"listing_id": "B", "role": "cheapest"})
+
+    def feedback(self, st=None, **kwargs):
+        return apply_feedback(st or state(), self.shown, self.listings, ranker(), **kwargs)
+
+    def test_particles_are_deterministic_and_centred(self):
+        from world_model import preference
+        rows = preference.particles()
+        self.assertEqual(len(rows), preference.N_PARTICLES)
+        self.assertIs(rows, preference.particles())
+        self.assertTrue(all(0.25 <= value <= 4.0 for row in rows for value in row[:4]))
+        prior = preference.posterior_adjust([])
+        for key in ("value", "groceries", "commute"):
+            self.assertAlmostEqual(prior[key], 1.0, places=3)
+        self.assertLess(prior["station"], 1.0)
+
+    def test_choice_moves_weights_towards_what_the_chosen_home_is_better_at(self):
+        patch, _notes = self.feedback(chosen_id="B")          # B 更便宜、买菜更远
+        self.assertGreater(patch["weight_adjust"]["value"], 1.0)
+        self.assertLess(patch["weight_adjust"]["groceries"], 1.0)
+        self.assertEqual(len(patch["preference_evidence"]), 1)
+        confirm, _notes = self.feedback(chosen_id="A")        # 选首选也是证据：方向相反
+        self.assertLess(confirm["weight_adjust"]["value"], 1.0)
+        self.assertGreater(confirm["weight_adjust"]["groceries"], 1.0)
+
+    def test_evidence_accumulates_instead_of_compounding_a_fixed_factor(self):
+        st = state()
+        values = []
+        for _ in range(4):
+            patch, _notes = self.feedback(st, chosen_id="B")
+            st = apply_state_patch(st, patch)
+            values.append(st.soft_preferences["weight_adjust"]["value"])
+        self.assertEqual(values, sorted(values))
+        self.assertLess(values[-1] - values[-2], values[1] - values[0])      # 收益递减，不是每次 ×1.5
+        self.assertLessEqual(values[-1], 4.0)
+        self.assertEqual(len(st.soft_preferences["preference_evidence"]), 4)
+
+    def test_same_evidence_gives_the_same_weights(self):
+        first, _ = self.feedback(chosen_id="B")
+        second, _ = self.feedback(chosen_id="B")
+        self.assertEqual(first, second)
+
+    def test_stated_reason_is_evidence_without_a_choice(self):
+        patch, notes = self.feedback(reasons=["太贵"])
+        self.assertGreater(patch["weight_adjust"]["value"], 1.15)
+        self.assertEqual(patch["preference_evidence"], [{"r": "value"}])
+        self.assertEqual(notes, ["更看重价格"])
+        station, _ = self.feedback(reasons=["离车站远"])
+        from world_model.preference import posterior_adjust
+        self.assertGreater(station["weight_adjust"]["station"], posterior_adjust([])["station"])
+
+    def test_choosing_closer_to_station_raises_station_weight(self):
+        self.listings = {"A": home("A", rent=650, market=1, walk=900), "B": home("B", rent=650, market=1, walk=100)}
+        from world_model.preference import posterior_adjust
+        patch, _notes = self.feedback(chosen_id="B")
+        self.assertGreater(patch["weight_adjust"]["station"], posterior_adjust([])["station"])
+
+    def test_area_and_unknown_commute_still_handled(self):
+        patch, notes = self.feedback(rejected_ids=["B"], reasons=["不喜欢这个区"])
+        self.assertEqual(patch, {"excluded_districts": ["Redfern"]})
+        patch, notes = self.feedback(reasons=["通勤太麻烦"])
+        self.assertEqual(patch, {})
+        self.assertIn("还不知道目的地", notes[0])
+
+    def test_feedback_never_touches_hard_requirements(self):
+        patch, _notes = self.feedback(chosen_id="B", rejected_ids=["A"], reasons=["太贵", "离车站远"])
+        self.assertEqual(set(patch), {"weight_adjust", "preference_evidence"})
+
+    def test_evidence_is_validated_bounded_and_never_written_by_the_llm(self):
+        good = {"c": [1, 2, 3, 4, 0], "o": [[1, 2, 3, 4, 0]]}
+        bad = [{"c": [1, 2], "o": [[1, 2, 3, 4, 0]]}, {"c": [1, 2, 3, 4, float("nan")], "o": [[1, 2, 3, 4, 0]]},
+               {"c": [1, 2, 3, 4, 0], "o": []}, {"r": "rent"}, "x", {"c": [1, 2, 3, 4, True], "o": [[1, 2, 3, 4, 0]]}]
+        self.assertEqual(len(validate_patch({"preference_evidence": bad + [good, {"r": "value"}]})["preference_evidence"]), 2)
+        st = state()
+        for _ in range(40):
+            st = apply_state_patch(st, {"preference_evidence": [good]})
+        self.assertEqual(len(st.soft_preferences["preference_evidence"]), 30)
+        result = extract_needs("预算800", llm=lambda prompt: {"preference_evidence": [good]})
+        self.assertNotIn("preference_evidence", result.patch)
+        self.assertIn("preference_evidence", result.dropped)
+
+    def test_state_with_evidence_survives_json(self):
+        patch, _notes = self.feedback(chosen_id="B")
+        st = apply_state_patch(state(), patch)
+        restored = json.loads(json.dumps(st.to_dict(), allow_nan=False))
+        self.assertEqual(restored["soft_preferences"]["preference_evidence"], patch["preference_evidence"])
+
+    def test_eus_set_covers_different_plausible_preferences(self):
+        # A 综合最优；B 明显更省钱但买菜远；C 与 A 几乎一样（只差一点）。EUS 应选 B 而不是近似重复的 C。
+        pool = [home("A", rent=600, market=2), home("C", rent=602, market=2), home("B", rent=545, market=11)]
+        picks = recommend_set(state(), pool, ranker(), SNAP, k=2, selector="eus")
+        self.assertEqual([item["listing_id"] for item in picks], ["A", "B"])
+        self.assertEqual([item["role"] for item in picks], ["best", "cheapest"])
+        roles = recommend_set(state(), pool, ranker(), SNAP, k=2, selector="roles")
+        self.assertEqual(roles[0]["listing_id"], "A")
+
+    def test_eus_first_pick_is_always_the_ranker_top_and_respects_slack(self):
+        pool = [home("A", rent=600, market=1), home("B", rent=300, market=60), home("C", rent=610, market=2)]
+        picks = recommend_set(state(), pool, ranker(), SNAP, selector="eus")
+        self.assertEqual(picks[0]["listing_id"], ranker().rank(state(), pool, SNAP)[0])
+        self.assertEqual(picks[0]["role"], "best")
+        self.assertNotIn("cheapest", [item["role"] for item in picks if item["listing_id"] == "B"])
+        ids = [item["listing_id"] for item in picks]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_advisor_learns_from_repeated_choices(self):
+        pool = [home("A", rent=600, market=2), home("B", rent=560, market=9), home("C", rent=640, market=1)]
+        st = state(other_confirmed={"needs": {"pets": False, "furnished": False, "parking": False},
+                                    "budget_stretch_pct": 0.0}, soft_preferences={"commute_to": "none"},
+                   station_walk=StationWalkRequirement(status="confirmed", max_m=None))
+        advisor = RentalAdvisor(pool, ranker(), initial_state=st)
+        self.assertEqual(advisor.next()["recommendations"][0]["listing_id"], "A")
+        step = advisor.feedback(chosen_id="B")["next"]
+        step = advisor.feedback(chosen_id="B")["next"]
+        self.assertEqual(step["recommendations"][0]["listing_id"], "B")
+        self.assertEqual(advisor.rejected_listing_ids, set())       # 是学出来的，不是靠移除 A
+        self.assertGreater(advisor.state.soft_preferences["weight_adjust"]["value"], 1.0)
 
 
 if __name__ == "__main__":

@@ -11,8 +11,8 @@ The advisor extracts explicit English or Chinese preferences, ranks a private
 rental snapshot, asks up to two useful questions, and recommends up to three
 homes with different tradeoffs. Users can answer with an option or custom text,
 skip questions, add requirements, choose a home, reject one, or explain feedback.
-Rejected homes remain excluded for that search; feedback otherwise adjusts soft
-weights using the supplied model's rules. Unknown features remain unknown.
+Rejected homes remain excluded for that search; choosing a home or giving a reason
+updates a belief over the soft weights (see Preference learning). Unknown features remain unknown.
 No requirement is automatically relaxed. Ordinary property chat still uses live
 Microburbs lookups and works independently of the advisor.
 
@@ -22,6 +22,63 @@ Walking distances use the supplied straight-line detour estimates and uncertaint
 bands. Fair rent models asking prices, not signed leases. Snapshot listings are
 not evidence of current availability. Heuristic priors and weights are not
 calibrated satisfaction probabilities; source evaluation results are offline tests.
+
+## Preference learning
+
+`compute/world_model/preference.py` learns the four soft weights (value, groceries,
+station, commute) from what the user picks.
+
+- **Choice model.** Picking one of the homes shown is treated as a multinomial-logit
+  choice over the ranker's own score components. The belief over weight multipliers
+  and choice sharpness is a fixed, seeded set of 1,000 samples reweighted by the
+  evidence. Saved state holds only the evidence (at most 30 entries, about 6 KB with
+  the rest of the state), so the belief is reproducible and has no random state.
+  The ranker uses the posterior mean, which for a linear score is the expected-utility ranking.
+- **Which homes to show.** The first home is the ranker's top pick. The others are
+  chosen greedily to maximise expected utility of selection: each must be clearly
+  better under some weights that are still plausible, and within 15 points of the top pick.
+  Role labels (lower rent, closer to a station, closer to your destination) are kept.
+- **Skipped top pick.** If the user picks another home and the top pick still ranks
+  first after the update, it is dropped only on the third such skip
+  (`DEFAULT_SKIP_PATIENCE`). Skip counts and dropped homes are saved with the session.
+  Homes the user explicitly rejects are still excluded immediately.
+
+The previous fixed multipliers (x1.5, x2) remain available as `learner="heuristic"`,
+and the fixed role picker as `selector="roles"`, for comparison.
+
+`python scripts/eval-preference-learning.py --data <dir>` compares the options on
+simulated users with hidden weights who pick noisily for six rounds. Regret is the
+true score of the top recommendation minus the true score of that user's best home
+(1 point is about 1% of rent). 500 users, seed 42; seed 7 gives the same order.
+
+| Configuration | Start | After 6 picks | After 6 picks, unseen taste |
+|---|---:|---:|---:|
+| No learning | 1.67 | 1.67 | 3.11 |
+| Before: fixed multipliers, fixed roles, drop on first skip | 1.67 | 2.98 | 3.49 |
+| Fixed multipliers, fixed roles, drop on second skip | 1.67 | 1.86 | 2.93 |
+| Belief, fixed roles, drop on second skip | 1.67 | 1.36 | 2.19 |
+| Belief, EUS set, drop on first skip | 1.67 | 3.09 | 3.51 |
+| **Default: belief, EUS set, drop on third skip** | 1.67 | **0.96** | **1.80** |
+| Belief, EUS set, never drop | 1.67 | 0.48 | 1.56 |
+
+Paired against the previous behaviour, the default lowers final regret by 2.02 ±0.38
+points (1.69 ±0.46 with unseen taste). The EUS set also contains the user's true best
+home far more often at the start: its regret is 0.09 against 0.69 for fixed roles.
+
+What this does and does not show:
+
+- Dropping the top pick on the first skip made six rounds of feedback worse than no
+  learning at all, whichever learner was used. That rule, not the multipliers, was the main problem.
+- "Never drop" scores best but can show the same top pick indefinitely to a user who
+  keeps choosing something else, so the default keeps a bounded drop rule.
+- Simulated users follow the same kind of choice rule the learner assumes. Their weights
+  are not drawn from its prior, half ignore station distance entirely, and the unseen-taste
+  column adds a per-home preference no feature explains, but this is still a simulation,
+  not evidence about real renters. The gain shrinks as choices get noisier.
+- After the first piece of feedback, station distance gets a small non-zero weight
+  (about 2 to 3 points per kilometre) even if the user never mentioned stations.
+- A session saved before this change keeps its old `weight_adjust` until the next
+  feedback, which replaces it with the posterior mean.
 
 ## Private artifacts
 

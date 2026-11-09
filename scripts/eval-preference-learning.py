@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "compute"))
 
 from world_model.advisor import RentalAdvisor  # noqa: E402
-from world_model.fair_rent import FairRentModel  # noqa: E402
+from world_model.fair_rent_boosted import load_fair_rent_model  # noqa: E402
 from world_model.microburbs import listing_from_microburbs  # noqa: E402
 from world_model.needs import apply_state_patch  # noqa: E402
 from world_model.questions import QUESTION_HINTS  # noqa: E402
@@ -56,7 +56,7 @@ NOISE = (0.08, 0.25, 1.0)      # logit sharpness per point: noisy / typical / de
 
 
 def load(data_dir):
-    model = FairRentModel.from_json((data_dir / "fair_rent_model.json").read_text(encoding="utf-8"))
+    model = load_fair_rent_model((data_dir / "fair_rent_model.json").read_text(encoding="utf-8"))
     snapshot = json.loads((data_dir / "for_rent_snapshot.json").read_text(encoding="utf-8"))
     listings = [listing_from_microburbs(item["row"], item["enrichment"], model, snapshot["collected_at"])
                 for item in snapshot["listings"]]

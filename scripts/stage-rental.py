@@ -16,8 +16,8 @@ names = ['fair_rent_model.json', 'for_rent_snapshot.json']
 for name in names:
     if (source / name).resolve() != (target / name).resolve():
         shutil.copyfile(source / name, target / name)
-model = json.loads((target / names[0]).read_text())
-snapshot = json.loads((target / names[1]).read_text())
+model = json.loads((target / names[0]).read_text(encoding='utf-8'))
+snapshot = json.loads((target / names[1]).read_text(encoding='utf-8'))
 manifest = {'schema': 1, 'collectedAt': snapshot['collected_at'], 'modelVersion': model['version'],
             'files': {name: hashlib.sha256((target / name).read_bytes()).hexdigest() for name in names}}
 manifest['version'] = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()

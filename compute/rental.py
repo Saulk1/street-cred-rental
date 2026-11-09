@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from .world_model.advisor import RentalAdvisor
-from .world_model.fair_rent import FairRentModel
+from .world_model.fair_rent_boosted import load_fair_rent_model
 from .world_model.microburbs import listing_from_microburbs
 from .world_model.value_ranker import ValueRanker
 from .world_model.needs import extract_needs
@@ -33,7 +33,7 @@ def load_artifacts():
                 raise ValueError('hash')
             data[name] = json.loads(raw)
         snapshot = data['for_rent_snapshot.json']
-        model = FairRentModel.from_json(json.dumps(data['fair_rent_model.json']))
+        model = load_fair_rent_model(json.dumps(data['fair_rent_model.json']))
         if model.version != manifest['modelVersion'] or snapshot['collected_at'] != manifest['collectedAt']:
             raise ValueError('metadata')
         listings = tuple(listing_from_microburbs(item['row'], item['enrichment'], model, snapshot['collected_at'])

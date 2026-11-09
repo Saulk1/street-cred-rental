@@ -80,6 +80,57 @@ What this does and does not show:
 - A session saved before this change keeps its old `weight_adjust` until the next
   feedback, which replaces it with the posterior mean.
 
+## Fair rent model
+
+`fair_rent_model.json` may hold either version; `load_fair_rent_model` reads both and
+the ranker only ever sees the resulting `fair_rent` on each listing.
+
+- **v1** (`fair_rent.py`): hand-built layers in log space. Month trend, bedroom x type
+  base, shrunk suburb and 250 m grid offsets, bathroom and parking offsets.
+- **v2** (`fair_rent_boosted.py`, `boosting.py`): keeps v1's month trend and base, and
+  learns the rest with gradient-boosted trees (histogram splits, standard library only).
+  Its main features are statistics of earlier listings only: the same home's previous
+  rent, and average residuals for the same building, the same building and bedroom
+  count, the suburb cell and the grid cell. Training walks forward day by day, so a
+  listing never sees its own day or anything later. A home listed before with the same
+  bedroom count is blended with its previous residual at a weight chosen on validation.
+
+`python scripts/fit-fair-rent.py --data <dir>` fits on listings before 1 August 2026 and
+predicts the 4,271 later ones, each from what was known before its date. Tree count and
+blend weight are chosen on the 90 days before the cutoff, never on the test period.
+
+| | v1 | v2 |
+|---|---:|---:|
+| Mean absolute error | $109.3 | $92.0 |
+| Median absolute percentage error | 6.96% | 5.88% |
+| Within 10% of the advertised rent | 63.7% | 70.0% |
+| Within 10%, home never listed before (2,614) | 52.3% | 61.9% |
+| Within 10%, home listed before (1,657) | 81.7% | 82.8% |
+
+v2 is closer on 58.7% of listings; the paired reduction in absolute log error is
+0.0164 ±0.0024. On the current snapshot the median gap between asking and fair rent
+falls from 9.2% to 5.5%, and homes more than 20% below fair rent fall from 118 to 57,
+so fewer listings are presented as bargains because of model error.
+
+Two fixes ship with v2 and matter as much as the model:
+
+- **Property IDs.** For-rent listings carry `GANSW720418858`; the rent history has
+  `720418858`. They never matched, so the repeat-listing signal was used for 0 of 1,845
+  live listings. IDs are now normalised (`normalize_gnaf`) and 1,744 match.
+- **A listing must not value itself.** A current listing's own advert is usually already
+  in the history. v2 removes it from every statistic before valuing it and falls back to
+  the home's earlier advert. Without this the median gap is 1.4%: the model echoes the asking price.
+
+Limits. This is still an asking-rent benchmark, not a lease price, and it has no floor
+area, level or condition, because the API does not provide them. The month trend is not
+extrapolated past the training window. Mesh-block income, crime and livability
+(`scripts/fetch-mesh-block-features.py`, `--areas`) were tested and add nothing
+measurable (MAE $91.6 against $92.0), because building and grid history already carry
+location; they are off by default. The v2 file is about 4 MB and adds roughly 0.3 s to a cold start.
+
+To refit: `python scripts/fit-fair-rent.py --data <dir> --write <out-dir>`, copy
+`for_rent_snapshot.json` next to the new model, then stage `<out-dir>` as below.
+
 ## Private artifacts
 
 Run `npm run rental:stage -- ./rental-world-model/data` after placing the supplied

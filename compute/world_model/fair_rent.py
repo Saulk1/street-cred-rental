@@ -57,6 +57,16 @@ class FairRentEstimate:
                 "support": self.support, "level": self.level}
 
 
+def normalize_gnaf(gnaf: Optional[str]) -> Optional[str]:
+    """房产编号统一成不带州前缀的数字串：在租接口给 "GANSW720418858"，租金历史里是 "720418858"。
+    不统一的话两边永远对不上，重复挂牌信号在给实时房源估值时一次都用不上。"""
+    if not gnaf:
+        return None
+    text = str(gnaf).strip()
+    digits = text.lstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+    return digits or text
+
+
 def _type_key(property_type: Optional[str]) -> str:
     text = (property_type or "").strip().lower()
     if text in ("house", "townhouse"):
@@ -192,7 +202,7 @@ class FairRentModel:
         # 6) 重复挂牌：每个 GNAF 最近一次租金
         for row in data:
             if row.gnaf:
-                model.last_seen[row.gnaf] = (row.weekly_rent, row.listing_date)
+                model.last_seen[normalize_gnaf(row.gnaf)] = (row.weekly_rent, row.listing_date)
         return model
 
     # -------------------------------------------------------------- predict
@@ -240,7 +250,7 @@ class FairRentModel:
             car_spaces=car_spaces, lat=lat, lng=lng, date_text=date_text)
         hedonic = math.exp(log_value)
         repeat: Optional[float] = None
-        seen = self.last_seen.get(gnaf or "")
+        seen = self.last_seen.get(normalize_gnaf(gnaf) or "")
         if seen is not None:
             prior_rent, prior_date = seen
             if not (exclude_same_date and date_text and prior_date >= date_text):

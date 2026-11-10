@@ -37,7 +37,7 @@ function RentGauge({ rent, fair }: { rent: number; fair: number | null }) {
   const caption = fairRentCaption(rent, fair);
   return <div className="flex flex-col gap-1.5">
     <div role="img" aria-label={caption} className="relative h-3">
-      <span className="absolute inset-x-0 top-1 h-1 rounded-full bg-muted" />
+      <span className="absolute inset-x-0 top-1 h-1 rounded-full bg-foreground/10" />
       <span className="absolute top-1 h-1 rounded-full bg-primary/30" style={{ insetInlineStart: percent(Math.min(50, position)), inlineSize: percent(Math.abs(position - 50)) }} />
       <span className="absolute inset-y-0 start-1/2 w-0.5 -translate-x-1/2 rounded-full bg-foreground/60" />
       <span className="absolute top-0 size-3 -translate-x-1/2 rounded-full bg-primary ring-2 ring-card" style={{ insetInlineStart: percent(position) }} />
@@ -53,7 +53,7 @@ function WalkBand({ walk, band }: { walk: number | null; band: (number | null)[]
   const caption = low === high ? `About ${metres(walk)}` : `About ${metres(walk)}, likely ${Math.round(low)}–${metres(high)}`;
   return <div className="flex flex-col gap-1.5">
     <div role="img" aria-label={`Estimated station walk: ${caption}`} className="relative h-3">
-      <span className="absolute inset-x-0 top-1 h-1 rounded-full bg-muted" />
+      <span className="absolute inset-x-0 top-1 h-1 rounded-full bg-foreground/10" />
       <span className="absolute top-1 h-1 rounded-full bg-primary/30" style={{ insetInlineStart: percent(scale(low)), inlineSize: percent(scale(high) - scale(low)) }} />
       <span className="absolute top-0.5 size-2 -translate-x-1/2 rounded-full bg-primary" style={{ insetInlineStart: percent(scale(walk)) }} />
     </div>

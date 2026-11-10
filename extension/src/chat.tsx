@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { FactsBrand } from '@/components/facts-brand';
+import { SydneyBackdrop } from '@/components/sydney-backdrop';
 import { chatConfiguration, readThread, receiveChat } from '@/lib/chat';
 import { CalculationTrace } from '@/components/calculation-trace';
 import { CHAT_KEY, type ChatEvent, type ChatMessage } from '../../shared/chat';
@@ -174,7 +175,8 @@ function PropertyChatSession() {
   const retry = messages.at(-1)?.role === 'assistant' && messages.at(-1)?.state === 'incomplete';
   const latestRentalId = [...messages].reverse().find(m => m.role === 'assistant' && m.rental)?.id;
 
-  return <main className="chat-shell">
+  return <main className="chat-shell chat-glass">
+    <SydneyBackdrop />
     <header className="chat-header"><div><FactsBrand /><p className="chat-tagline">A little local knowledge.</p></div><button className="popup-button" disabled={!loaded} onClick={newChat}><PlusIcon aria-hidden="true" />New chat</button></header>
     <section className="chat-intro"><div><h1>Property assistant</h1><p>Look up an address, or describe the rental you want.</p></div><span className="chat-coverage"><MapPinIcon aria-hidden="true" />City of Sydney</span></section>
     {!available && <aside className="chat-notice"><h2>Chat is unavailable in this build</h2><p>Your team needs to configure and rebuild the private extension to enable chat.</p></aside>}

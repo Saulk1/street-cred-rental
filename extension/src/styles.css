@@ -390,6 +390,40 @@ body[data-page="sidepanel"] .guide-intro h1 { font-size: 28px; }
 .calculation-data > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .calculation-data dt { color: var(--muted-foreground); }
 .calculation-data dd { margin: 0; overflow-wrap: anywhere; }
+/* Chat over the Sydney street scene: translucent, blurred surfaces. Inner data cards stay
+   mostly opaque so figures remain readable; text colours are darkened to keep contrast. */
+.sydney-backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: #051233; }
+.sydney-backdrop svg { display: block; inline-size: 100%; block-size: 100%; }
+.sydney-pan { animation: sydney-pan var(--pan, 200s) linear infinite; will-change: transform; }
+.sydney-trail { animation: sydney-flow var(--speed, 6s) linear infinite; animation-delay: var(--delay, 0s); }
+.sydney-trail.back { animation-direction: reverse; }
+.sydney-tram { animation: sydney-tram 38s linear infinite; animation-delay: -9s; }
+@keyframes sydney-pan { to { transform: translateX(-1600px); } }
+@keyframes sydney-flow { from { transform: translateX(-400px); } to { transform: translateX(1700px); } }
+@keyframes sydney-tram { from { transform: translateX(1700px); } to { transform: translateX(-420px); } }
+.chat-glass {
+  --glass: rgb(255 255 255 / .8);
+  --glass-edge: rgb(255 255 255 / .6);
+  --glass-blur: blur(22px) saturate(1.5);
+  --card: rgb(255 255 255 / .86);
+  --muted: rgb(255 255 255 / .62);
+  --secondary: rgb(0 102 255 / .16);
+  --muted-foreground: #3f4d68;
+  --border: rgb(9 43 115 / .14);
+}
+.chat-glass :is(.chat-header, .chat-card, .chat-composer, .chat-notice) { border: 1px solid var(--glass-edge); background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: 0 10px 40px rgb(3 14 46 / .28); }
+.chat-glass .chat-header { padding: 10px 12px 10px 18px; border-radius: 20px; }
+.chat-glass .chat-card-heading { border-block-end-color: var(--border); }
+.chat-glass .chat-intro h1 { color: white; text-shadow: 0 2px 18px rgb(3 14 46 / .5); }
+.chat-glass .chat-intro > div > p:last-child { color: rgb(255 255 255 / .86); }
+.chat-glass .chat-coverage { border-color: var(--glass-edge); background: rgb(255 255 255 / .82); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.chat-glass :is(.chat-privacy, .chat-status) { color: rgb(255 255 255 / .82); text-shadow: 0 1px 8px rgb(3 14 46 / .6); }
+.chat-glass .chat-notice.error { background: rgb(255 247 237 / .92); }
+@media (prefers-reduced-transparency: reduce) {
+  .chat-glass { --glass: #f7f9fd; --card: white; --muted: #eef2f9; --secondary: #e5efff; }
+  .chat-glass :is(.chat-header, .chat-card, .chat-composer, .chat-notice, .chat-coverage) { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (forced-colors: active) { .sydney-backdrop { display: none; } }
 @media (max-width: 620px) {
   .chat-shell { padding: 16px 12px; gap: 12px; }
   .chat-header { align-items: flex-start; gap: 10px; }

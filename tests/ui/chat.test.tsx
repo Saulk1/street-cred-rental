@@ -25,6 +25,14 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function mount() { const view = render(<PropertyChat />); await waitFor(() => expect(screen.getByRole('button', { name: 'New chat' })).toBeEnabled()); return view; }
 
+it('keeps the street-scene backdrop decorative', async () => {
+  await mount();
+  const backdrop = document.querySelector('.sydney-backdrop')!;
+  expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+  expect(within(backdrop as HTMLElement).queryAllByRole('img')).toHaveLength(0);
+  expect(backdrop.querySelectorAll('a, button, [tabindex]')).toHaveLength(0);
+});
+
 it('offers example questions that fill the composer without sending anything', async () => {
   const fetcher = vi.spyOn(globalThis, 'fetch');
   const user = userEvent.setup();

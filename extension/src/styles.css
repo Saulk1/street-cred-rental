@@ -97,6 +97,13 @@ html:has(body[data-page="popup"]) { inline-size: 440px; }
 body[data-page="popup"], body[data-page="options"] {
   --background: #f4f6fb;
   --foreground: #092b73;
+  /* Surfaces inside shadcn components follow the same blue palette as the page. */
+  --card-foreground: #092b73;
+  --popover-foreground: #092b73;
+  --secondary-foreground: #0b4aa8;
+  --muted: #eef2f9;
+  --accent: #e5efff;
+  --accent-foreground: #092b73;
   --primary: #0066ff;
   --muted-foreground: #647188;
   --border: #dce4f1;

@@ -8,12 +8,21 @@ import { Message, MessageContent, MessageHeader, MessageFooter } from '@/compone
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { Trace, TraceLine, TraceIcon, TraceTitle } from '@/components/ui/trace';
 import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { FactsBrand } from '@/components/facts-brand';
 import { chatConfiguration, readThread, receiveChat } from '@/lib/chat';
 import { CalculationTrace } from '@/components/calculation-trace';
 import { CHAT_KEY, type ChatEvent, type ChatMessage } from '../../shared/chat';
 
 type Activity = Extract<ChatEvent, { type: 'tool' }>;
+
+/** Examples of what the assistant can do. Address examples end mid-sentence so the user supplies the address. */
+const STARTERS = [
+  { label: 'Find a one-bedroom rental under $800 a week near UTS', text: 'Find a one-bedroom rental under $800 a week near UTS' },
+  { label: 'Tell me about the property at…', text: 'Tell me about the property at ' },
+  { label: 'What are the flood, bushfire and heritage risks at…', text: 'What are the flood, bushfire and heritage risks at ' },
+];
 
 export function PropertyChat() {
   return <MessageScrollerProvider autoScroll defaultScrollPosition="end"><PropertyChatSession /></MessageScrollerProvider>;
@@ -157,18 +166,30 @@ function PropertyChatSession() {
     current.current = []; hydrated.current = true; setMessages([]); persist([], true);
     setDraft(''); setError(''); setStorageError(''); setBusy(false); setActivity([]); editor.current?.focus();
   }
+  /** Puts an example into the composer for the user to finish and send; nothing is sent until they do. */
+  function startWith(text: string) {
+    setDraft(text);
+    requestAnimationFrame(() => { editor.current?.focus(); editor.current?.setSelectionRange(text.length, text.length); });
+  }
   const retry = messages.at(-1)?.role === 'assistant' && messages.at(-1)?.state === 'incomplete';
   const latestRentalId = [...messages].reverse().find(m => m.role === 'assistant' && m.rental)?.id;
 
   return <main className="chat-shell">
     <header className="chat-header"><div><FactsBrand /><p className="chat-tagline">A little local knowledge.</p></div><button className="popup-button" disabled={!loaded} onClick={newChat}><PlusIcon aria-hidden="true" />New chat</button></header>
-    <section className="chat-intro"><div><p className="overview-eyebrow">Your property companion</p><h1>Property assistant</h1><p>From an address to a clearer local picture.</p></div><span className="chat-coverage"><MapPinIcon aria-hidden="true" />City of Sydney</span></section>
+    <section className="chat-intro"><div><h1>Property assistant</h1><p>Look up an address, or describe the rental you want.</p></div><span className="chat-coverage"><MapPinIcon aria-hidden="true" />City of Sydney</span></section>
     {!available && <aside className="chat-notice"><h2>Chat is unavailable in this build</h2><p>Your team needs to configure and rebuild the private extension to enable chat.</p></aside>}
     {storageError && <aside className="chat-notice error" role="alert"><h2>Chat storage</h2><p>{storageError}</p></aside>}
-    <section className="chat-card" aria-label="Conversation" aria-busy={!loaded}><header className="chat-card-heading"><h2>Your conversation</h2><span>Property facts · Local context</span></header>
+    <section className="chat-card" aria-label="Conversation" aria-busy={!loaded}><header className="chat-card-heading"><h2>Your conversation</h2></header>
       <MessageScroller className="flex-1"><MessageScrollerViewport className="chat-thread" aria-label="Conversation messages"><MessageScrollerContent className="pb-14">
         {!messages.length && <MessageScrollerItem messageId="chat-empty">
-          <div className="chat-empty"><span className="chat-empty-icon"><MapPinIcon aria-hidden="true" /></span><h3>{loaded ? 'What would you like to know?' : 'Loading your conversation…'}</h3><p>Ask about an address in the City of Sydney. Explore property facts, estimates and the neighbourhood.</p><div className="chat-topics"><span>Property facts</span><span>Prices &amp; history</span><span>Neighbourhood</span></div></div>
+          <Empty>
+            <EmptyHeader><EmptyMedia variant="icon"><MapPinIcon aria-hidden="true" /></EmptyMedia>
+              <EmptyTitle role="heading" aria-level={3}>{loaded ? 'What would you like to know?' : 'Loading your conversation…'}</EmptyTitle>
+              <EmptyDescription>Ask about an address in the City of Sydney, or say what you need in a rental and the advisor will compare homes for you.</EmptyDescription></EmptyHeader>
+            {loaded && available && <EmptyContent><ul aria-label="Example questions" className="flex w-full list-none flex-col gap-2 p-0">
+              {STARTERS.map(starter => <li key={starter.text}><Button variant="outline" className="h-auto w-full justify-start py-2 text-start whitespace-normal" onClick={() => startWith(starter.text)}>{starter.label}</Button></li>)}
+            </ul></EmptyContent>}
+          </Empty>
         </MessageScrollerItem>}
         {messages.map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.role === 'user'}>
           <Message align={message.role === 'user' ? 'end' : 'start'}><MessageContent>
@@ -186,7 +207,7 @@ function PropertyChatSession() {
     </section>
     <div role="status" aria-live="polite" className="chat-status">{busy ? 'Generating an answer.' : error || (retry ? 'Answer interrupted. You can retry or ask another question.' : '')}</div>
     {retry && !busy && <button className="popup-button chat-retry" disabled={!available} onClick={() => void send(true)}><RotateCcwIcon aria-hidden="true" />Retry answer</button>}
-    <form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(); }}><label htmlFor="chat-message" className="popup-sr-only">Message</label><textarea ref={editor} id="chat-message" name="message" maxLength={4000} rows={3} placeholder="Ask about a property…" value={draft} disabled={!loaded || !available} aria-describedby="chat-privacy chat-keyboard-hint" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
+    <form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(); }}><label htmlFor="chat-message" className="popup-sr-only">Message</label><textarea ref={editor} id="chat-message" name="message" maxLength={4000} rows={3} placeholder="Ask about a property or a rental…" value={draft} disabled={!loaded || !available} aria-describedby="chat-privacy chat-keyboard-hint" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
       if (event.key === 'Enter' && !event.shiftKey) { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
     }} /><footer><span id="chat-keyboard-hint">Shift + Enter for a new line</span>{busy ? <button type="button" className="popup-button" onClick={() => request.current?.abort()}><SquareIcon aria-hidden="true" />Stop</button> : <button className="popup-button primary" type="submit" disabled={!loaded || !available || !draft.trim()}><ArrowUpIcon aria-hidden="true" />Send</button>}</footer></form>
     <p id="chat-privacy" className="chat-privacy">Messages and requested property data are sent to your team’s backend and OpenAI. This chat is saved in this Chrome profile. Anonymous rental preferences are stored on the backend; the rental session expires after 30 minutes of inactivity. Rental listings come from a dated snapshot; estimates and availability need confirmation.</p>

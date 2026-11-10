@@ -98,6 +98,8 @@ function Living({ amenities, transport }: { amenities: SavedData; transport: Sav
   const places = Array.isArray(record(amenities.data).results) ? (record(amenities.data).results as unknown[]).map(record) : [];
   const stops = Object.values(record(record(transport.data).nearest)).map(record).filter(item => number(item.distance_m) !== null && (item.distance_m as number) >= 0).sort((a, b) => (a.distance_m as number) - (b.distance_m as number));
   function nearest(pattern: RegExp) { return places.filter(item => pattern.test(String(item.category))).sort((a, b) => (number(a.distance_m) ?? Infinity) - (number(b.distance_m) ?? Infinity))[0]; }
+  // The distance is shown once: in the badge when the place has a name, otherwise as the only detail.
+  const placeName = (value: Record<string, unknown>) => text(value.name) ?? text(value.label) ?? text(value.category);
   const rows = [
     { title: 'Public transport', icon: TrainFrontIcon, value: stops[0], loading: transport.loading },
     { title: 'Parks & recreation', icon: TreePineIcon, value: nearest(/park|green|recreation|pool/i), loading: amenities.loading },
@@ -106,7 +108,7 @@ function Living({ amenities, transport }: { amenities: SavedData; transport: Sav
     { title: 'Noise exposure', icon: Volume2Icon, value: undefined, loading: false },
     { title: 'Greenery', icon: LeafIcon, value: undefined, loading: false },
   ];
-  return <SectionCard title="Everyday living" caption="Straight-line distances"><ul className="overview-list">{rows.map(({ title, icon: Icon, value, loading }) => <li className="overview-living-row" key={title}><span className="overview-icon"><Icon aria-hidden="true" /></span><div><h3>{title}</h3><p className="overview-muted">{loading ? 'Loading saved data…' : value ? [text(value.name) ?? text(value.label) ?? text(value.category), distance(value.distance_m)].filter(Boolean).join(' · ') || 'Distance not supplied' : 'Not available in the returned data'}</p></div>{value && distance(value.distance_m) && <span className="popup-badge">{distance(value.distance_m)}</span>}</li>)}</ul></SectionCard>;
+  return <SectionCard title="Everyday living" caption="Straight-line distances"><ul className="overview-list">{rows.map(({ title, icon: Icon, value, loading }) => <li className="overview-living-row" key={title}><span className="overview-icon"><Icon aria-hidden="true" /></span><div><h3>{title}</h3><p className="overview-muted">{loading ? 'Loading saved data…' : value ? placeName(value) ?? distance(value.distance_m) ?? 'Distance not supplied' : 'Not available in the returned data'}</p></div>{value && placeName(value) && distance(value.distance_m) && <span className="popup-badge">{distance(value.distance_m)}</span>}</li>)}</ul></SectionCard>;
 }
 
 function Wellbeing({ source }: { source: SavedData }) {

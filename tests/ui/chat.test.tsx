@@ -25,6 +25,38 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function mount() { const view = render(<PropertyChat />); await waitFor(() => expect(screen.getByRole('button', { name: 'New chat' })).toBeEnabled()); return view; }
 
+it('offers example questions that fill the composer without sending anything', async () => {
+  const fetcher = vi.spyOn(globalThis, 'fetch');
+  const user = userEvent.setup();
+  await mount();
+  const examples = within(screen.getByRole('list', { name: 'Example questions' })).getAllByRole('button');
+  expect(examples.map(item => item.textContent)).toEqual(['Find a one-bedroom rental under $800 a week near UTS',
+    'Tell me about the property at…', 'What are the flood, bushfire and heritage risks at…']);
+  const box = screen.getByRole('textbox', { name: 'Message' }) as HTMLTextAreaElement;
+  await user.click(examples[1]);
+  expect(box.value).toBe('Tell me about the property at ');
+  await waitFor(() => expect(box).toHaveFocus());
+  await user.type(box, '26 Tudor Street');
+  expect(box.value).toBe('Tell me about the property at 26 Tudor Street');
+  expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it('hides example questions when chat is unavailable and once a conversation exists', async () => {
+  vi.stubGlobal('CHAT_API_CONFIG', { baseUrl: 'https://chat.example.test', token: '' });
+  const view = await mount();
+  expect(screen.queryByRole('list', { name: 'Example questions' })).toBeNull();
+  view.unmount();
+  vi.stubGlobal('CHAT_API_CONFIG', { baseUrl: 'https://chat.example.test', token: 'dummy-team-token' });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(reply({ type: 'delta', text: 'Fixture answer.' }, { type: 'done' }));
+  const user = userEvent.setup();
+  await mount();
+  await user.click(within(screen.getByRole('list', { name: 'Example questions' })).getAllByRole('button')[0]);
+  await user.click(screen.getByRole('button', { name: 'Send' }));
+  await screen.findByText('Fixture answer.');
+  expect(screen.queryByRole('list', { name: 'Example questions' })).toBeNull();
+});
+
 it('sends, streams plain text safely, saves and restores one thread without reading notes', async () => {
   const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(reply(
     { type: 'tool', id: 'tool-1', label: 'Searching addresses', status: 'running' },
